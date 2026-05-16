@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,24 +10,24 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=compact-cards-1">
+    <link rel="stylesheet" href="styles.css?v=drag-reorder-2">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div>
           <h1>Money</h1>
-          <p id="monthSubtitle">自动整理收入、基金、支出和别人欠你的钱</p>
+          <p id="monthSubtitle">Track income, funds, expenses, and money owed to you</p>
         </div>
         <div class="topbar-actions">
-          <select id="monthSelect" aria-label="选择月份"></select>
-          <button id="newMonthBtn" type="button" title="新增月份">+</button>
+          <select id="monthSelect" aria-label="Select month"></select>
+          <button id="newMonthBtn" type="button" title="Add month">+</button>
           <div class="more-menu">
-            <button id="moreMenuBtn" class="icon-btn" type="button" aria-label="更多操作" aria-expanded="false">…</button>
+            <button id="moreMenuBtn" class="icon-btn" type="button" aria-label="More actions" aria-expanded="false">…</button>
             <div id="moreMenuPanel" class="more-menu-panel" hidden>
-              <button id="exportBtn" type="button">备份到文件</button>
+              <button id="exportBtn" type="button">Back Up to File</button>
               <label class="import-label">
-                恢复备份
+                Restore Backup
                 <input id="importInput" type="file" accept="application/json">
               </label>
             </div>
@@ -37,35 +37,38 @@
 
       <section id="backupReminder" class="backup-reminder" hidden>
         <div>
-          <strong>建议备份一次</strong>
-          <p id="backupReminderText">把备份文件存到 iCloud Drive，换手机也能恢复。</p>
+          <strong>Backup recommended</strong>
+          <p id="backupReminderText">Save a backup file to iCloud Drive so you can restore it on another phone.</p>
         </div>
         <div class="backup-actions">
-          <button id="backupNowBtn" type="button">备份</button>
-          <button id="dismissBackupBtn" type="button">稍后</button>
+          <button id="backupNowBtn" type="button">Back Up</button>
+          <button id="dismissBackupBtn" type="button">Later</button>
         </div>
       </section>
 
       <main>
-        <section class="summary-grid" aria-label="本月总览">
+        <section class="summary-grid" aria-label="Monthly overview">
           <article class="metric income">
-            <span>收入合计</span>
+            <span>Total Income</span>
             <strong id="totalIncome">0.00</strong>
           </article>
           <article class="metric allocated">
-            <span>已分配</span>
+            <span>Allocated</span>
             <strong id="allocatedAmount">0.00</strong>
           </article>
           <article class="metric left">
-            <span>待分配</span>
-            <strong id="unallocatedAmount">0.00</strong>
+            <div class="metric-copy">
+              <span>Unallocated</span>
+              <strong id="unallocatedAmount">0.00</strong>
+            </div>
+            <button id="allocateIncomeBtn" class="metric-action" type="button">Allocate</button>
           </article>
           <article class="metric spent">
-            <span>本月已花</span>
+            <span>Spent</span>
             <strong id="spentAmount">0.00</strong>
           </article>
           <article class="metric debt">
-            <span>别人欠我</span>
+            <span>Owed to Me</span>
             <strong id="debtAmount">0.00</strong>
           </article>
         </section>
@@ -73,14 +76,17 @@
         <section id="dashboardView">
           <section class="panel funds-panel">
             <div class="panel-title">
-              <h2>可用余额</h2>
+              <div class="fund-title-row">
+                <h2>Available Balance</h2>
+                <button id="quickExpenseBtn" type="button">Log</button>
+              </div>
               <div class="fund-tools">
-                <label class="search-field" aria-label="搜索基金">
-                  <input id="fundSearchInput" type="search" placeholder="搜索基金" autocomplete="off">
+                <label class="search-field" aria-label="Search funds">
+                  <input id="fundSearchInput" type="search" placeholder="Search funds" autocomplete="off">
                   <div id="fundSearchResults" class="search-results" hidden></div>
                 </label>
-                <button id="editFundOrderBtn" type="button">编辑</button>
-                <button id="addFundBtn" type="button">添加</button>
+                <button id="editFundOrderBtn" type="button">Edit</button>
+                <button id="addFundBtn" type="button">Add</button>
               </div>
             </div>
             <div id="fundList" class="fund-list"></div>
@@ -89,16 +95,16 @@
           <section class="manage-grid">
             <aside class="panel">
               <div class="panel-title">
-                <h2>收入</h2>
-                <button id="addIncomeBtn" type="button">添加</button>
+                <h2>Income</h2>
+                <button id="addIncomeBtn" type="button">Add</button>
               </div>
               <div id="incomeList" class="list"></div>
             </aside>
 
             <aside class="panel">
               <div class="panel-title">
-                <h2>别人欠我</h2>
-                <button id="addDebtBtn" type="button">添加</button>
+                <h2>Money Owed</h2>
+                <button id="addDebtBtn" type="button">Add</button>
               </div>
               <div id="debtList" class="list"></div>
             </aside>
@@ -106,48 +112,60 @@
         </section>
 
         <section id="detailView" class="detail-view" hidden>
-          <button id="backToDashboardBtn" type="button" class="back-btn">← 首页</button>
+          <button id="backToDashboardBtn" type="button" class="back-btn">← Home</button>
           <section class="panel detail-hero">
-            <div>
-              <p class="eyebrow">余额详情</p>
-              <h2 id="detailFundName">基金</h2>
+            <div class="detail-primary">
+              <div>
+                <p class="eyebrow">Balance Detail</p>
+                <h2 id="detailFundName">Fund</h2>
+              </div>
+              <div class="detail-balance">
+                <span>Available</span>
+                <strong id="detailBalance">0.00</strong>
+              </div>
             </div>
-            <div class="detail-balance">
-              <span>还可以花</span>
-              <strong id="detailBalance">0.00</strong>
-            </div>
-          </section>
 
-          <section class="detail-stats">
-            <article class="metric">
-              <span>期初余额</span>
-              <strong id="detailStart">0.00</strong>
-            </article>
-            <article class="metric allocated">
-              <span>本月分配</span>
-              <strong id="detailAllocation">0.00</strong>
-            </article>
-            <article class="metric spent">
-              <span>这个基金已花</span>
-              <strong id="detailSpent">0.00</strong>
-            </article>
+            <div class="detail-stats">
+              <article class="metric">
+                <span>Starting Balance</span>
+                <strong id="detailStart">0.00</strong>
+              </article>
+              <article class="metric allocated">
+                <span>Monthly Allocation</span>
+                <strong id="detailAllocation">0.00</strong>
+              </article>
+              <article class="metric spent">
+                <span>Spent in This Fund</span>
+                <strong id="detailSpent">0.00</strong>
+              </article>
+            </div>
           </section>
 
           <section class="panel expense-panel">
             <div class="panel-title">
-              <h2>具体花费</h2>
+              <h2>Expenses</h2>
               <div class="inline-actions">
-                <button id="detailEditFundBtn" type="button">编辑基金</button>
-                <button id="detailAddExpenseBtn" type="button">记一笔</button>
+                <button id="detailEditFundBtn" type="button">Edit Fund</button>
+                <button id="detailAddExpenseBtn" type="button">Log Expense</button>
               </div>
             </div>
             <div class="table-wrap">
-              <table>
+              <table class="detail-expense-table">
                 <thead>
                   <tr>
-                    <th>日期</th>
-                    <th>事项</th>
-                    <th class="number">金额</th>
+                    <th>
+                      <button class="sort-head" type="button" data-action="sort-detail-expenses" data-field="date" aria-label="Sort expenses by date">
+                        <span>Date</span>
+                        <span class="sort-arrow" aria-hidden="true"></span>
+                      </button>
+                    </th>
+                    <th>Note</th>
+                    <th class="number">
+                      <button class="sort-head" type="button" data-action="sort-detail-expenses" data-field="amount" aria-label="Sort expenses by amount">
+                        <span>Amount</span>
+                        <span class="sort-arrow" aria-hidden="true"></span>
+                      </button>
+                    </th>
                     <th class="action-cell"></th>
                   </tr>
                 </thead>
@@ -159,20 +177,20 @@
 
         <section class="panel expense-panel all-expenses-panel" hidden>
           <div class="panel-title">
-            <h2>消费记录</h2>
+            <h2>Expense Records</h2>
             <div class="inline-actions">
-              <select id="expenseFilter" aria-label="筛选消费分类"></select>
-              <button id="addExpenseBtn" type="button">添加消费</button>
+              <select id="expenseFilter" aria-label="Filter expense category"></select>
+              <button id="addExpenseBtn" type="button">Add Expense</button>
             </div>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>日期</th>
-                  <th>分类</th>
-                  <th>事项</th>
-                  <th class="number">金额</th>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Note</th>
+                  <th class="number">Amount</th>
                   <th class="action-cell"></th>
                 </tr>
               </thead>
@@ -185,31 +203,31 @@
 
     <dialog id="entryDialog">
       <form method="dialog" id="entryForm">
-        <h2 id="dialogTitle">添加</h2>
+        <h2 id="dialogTitle">Add</h2>
         <div id="formFields" class="form-fields"></div>
         <menu>
-          <button value="cancel" type="button" id="cancelDialogBtn">取消</button>
-          <button value="default" type="submit">保存</button>
+          <button value="cancel" type="button" id="cancelDialogBtn">Cancel</button>
+          <button value="default" type="submit">Save</button>
         </menu>
       </form>
     </dialog>
 
     <div id="monthDialog" class="month-modal" hidden>
       <form id="monthForm" class="month-card">
-        <h2>添加月份</h2>
-        <p class="dialog-note" id="monthDialogNote">会从当前月份结转每个基金的余额。</p>
+        <h2>Add Month</h2>
+        <p class="dialog-note" id="monthDialogNote">Balances will roll over from the current month.</p>
         <div class="form-fields">
-          <label class="field">选择年月
+          <label class="field">Month
             <input id="monthPicker" name="month" type="month" required>
           </label>
         </div>
         <menu>
-          <button value="cancel" type="button" id="cancelMonthBtn">取消</button>
-          <button value="default" type="submit">添加</button>
+          <button value="cancel" type="button" id="cancelMonthBtn">Cancel</button>
+          <button value="default" type="submit">Add</button>
         </menu>
       </form>
     </div>
 
-    <script src="app.js?v=compact-cards-2"></script>
+    <script src="app.js?v=drag-reorder-2"></script>
   </body>
 </html>
