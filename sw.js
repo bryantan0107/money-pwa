@@ -1,9 +1,9 @@
-const CACHE_NAME = "money-pwa-v3";
+const CACHE_NAME = "money-pwa-v23";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=compact-cards-1",
-  "./app.js?v=compact-cards-2",
+  "./styles.css?v=drag-reorder-2",
+  "./app.js?v=drag-reorder-2",
   "./manifest.webmanifest",
   "./icon.svg"
 ];
@@ -42,7 +42,7 @@ self.addEventListener("fetch", event => {
   }
 
   event.respondWith(
-    caches.match(request, { ignoreSearch: true })
+    caches.match(request)
       .then(cached => cached || fetch(request).then(response => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
