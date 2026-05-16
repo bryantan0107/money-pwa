@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f5f7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Money">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Money</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Money</h1>
+          <p id="monthSubtitle">自动整理收入、基金、支出和别人欠你的钱</p>
+        </div>
+        <div class="topbar-actions">
+          <select id="monthSelect" aria-label="选择月份"></select>
+          <button id="newMonthBtn" type="button" title="新增月份">+</button>
+          <div class="more-menu">
+            <button id="moreMenuBtn" class="icon-btn" type="button" aria-label="更多操作" aria-expanded="false">…</button>
+            <div id="moreMenuPanel" class="more-menu-panel" hidden>
+              <button id="exportBtn" type="button">备份到文件</button>
+              <label class="import-label">
+                恢复备份
+                <input id="importInput" type="file" accept="application/json">
+              </label>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="backupReminder" class="backup-reminder" hidden>
+        <div>
+          <strong>建议备份一次</strong>
+          <p id="backupReminderText">把备份文件存到 iCloud Drive，换手机也能恢复。</p>
+        </div>
+        <div class="backup-actions">
+          <button id="backupNowBtn" type="button">备份</button>
+          <button id="dismissBackupBtn" type="button">稍后</button>
+        </div>
+      </section>
+
+      <main>
+        <section class="summary-grid" aria-label="本月总览">
+          <article class="metric income">
+            <span>收入合计</span>
+            <strong id="totalIncome">0.00</strong>
+          </article>
+          <article class="metric allocated">
+            <span>已分配</span>
+            <strong id="allocatedAmount">0.00</strong>
+          </article>
+          <article class="metric left">
+            <span>待分配</span>
+            <strong id="unallocatedAmount">0.00</strong>
+          </article>
+          <article class="metric spent">
+            <span>本月已花</span>
+            <strong id="spentAmount">0.00</strong>
+          </article>
+          <article class="metric debt">
+            <span>别人欠我</span>
+            <strong id="debtAmount">0.00</strong>
+          </article>
+        </section>
+
+        <section id="dashboardView">
+          <section class="panel funds-panel">
+            <div class="panel-title">
+              <h2>可用余额</h2>
+              <div class="fund-tools">
+                <label class="search-field" aria-label="搜索基金">
+                  <input id="fundSearchInput" type="search" placeholder="搜索基金" autocomplete="off">
+                  <div id="fundSearchResults" class="search-results" hidden></div>
+                </label>
+                <button id="editFundOrderBtn" type="button">编辑</button>
+                <button id="addFundBtn" type="button">添加</button>
+              </div>
+            </div>
+            <div id="fundList" class="fund-list"></div>
+          </section>
+
+          <section class="manage-grid">
+            <aside class="panel">
+              <div class="panel-title">
+                <h2>收入</h2>
+                <button id="addIncomeBtn" type="button">添加</button>
+              </div>
+              <div id="incomeList" class="list"></div>
+            </aside>
+
+            <aside class="panel">
+              <div class="panel-title">
+                <h2>别人欠我</h2>
+                <button id="addDebtBtn" type="button">添加</button>
+              </div>
+              <div id="debtList" class="list"></div>
+            </aside>
+          </section>
+        </section>
+
+        <section id="detailView" class="detail-view" hidden>
+          <button id="backToDashboardBtn" type="button" class="back-btn">← 首页</button>
+          <section class="panel detail-hero">
+            <div>
+              <p class="eyebrow">余额详情</p>
+              <h2 id="detailFundName">基金</h2>
+            </div>
+            <div class="detail-balance">
+              <span>还可以花</span>
+              <strong id="detailBalance">0.00</strong>
+            </div>
+          </section>
+
+          <section class="detail-stats">
+            <article class="metric">
+              <span>期初余额</span>
+              <strong id="detailStart">0.00</strong>
+            </article>
+            <article class="metric allocated">
+              <span>本月分配</span>
+              <strong id="detailAllocation">0.00</strong>
+            </article>
+            <article class="metric spent">
+              <span>这个基金已花</span>
+              <strong id="detailSpent">0.00</strong>
+            </article>
+          </section>
+
+          <section class="panel expense-panel">
+            <div class="panel-title">
+              <h2>具体花费</h2>
+              <div class="inline-actions">
+                <button id="detailEditFundBtn" type="button">编辑基金</button>
+                <button id="detailAddExpenseBtn" type="button">记一笔</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>事项</th>
+                    <th class="number">金额</th>
+                    <th class="action-cell"></th>
+                  </tr>
+                </thead>
+                <tbody id="detailExpenseTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="panel expense-panel all-expenses-panel" hidden>
+          <div class="panel-title">
+            <h2>消费记录</h2>
+            <div class="inline-actions">
+              <select id="expenseFilter" aria-label="筛选消费分类"></select>
+              <button id="addExpenseBtn" type="button">添加消费</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th>分类</th>
+                  <th>事项</th>
+                  <th class="number">金额</th>
+                  <th class="action-cell"></th>
+                </tr>
+              </thead>
+              <tbody id="expenseTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="entryDialog">
+      <form method="dialog" id="entryForm">
+        <h2 id="dialogTitle">添加</h2>
+        <div id="formFields" class="form-fields"></div>
+        <menu>
+          <button value="cancel" type="button" id="cancelDialogBtn">取消</button>
+          <button value="default" type="submit">保存</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <div id="monthDialog" class="month-modal" hidden>
+      <form id="monthForm" class="month-card">
+        <h2>添加月份</h2>
+        <p class="dialog-note" id="monthDialogNote">会从当前月份结转每个基金的余额。</p>
+        <div class="form-fields">
+          <label class="field">选择年月
+            <input id="monthPicker" name="month" type="month" required>
+          </label>
+        </div>
+        <menu>
+          <button value="cancel" type="button" id="cancelMonthBtn">取消</button>
+          <button value="default" type="submit">添加</button>
+        </menu>
+      </form>
+    </div>
+
+    <script src="app.js?v=pwa-backup-1"></script>
+  </body>
+</html>
