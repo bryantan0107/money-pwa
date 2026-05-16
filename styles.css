@@ -931,46 +931,71 @@ menu {
 
   .fund-list {
     grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 10px;
+    gap: 8px;
+    padding: 8px;
   }
 
   .fund-card {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "head head"
+      "progress progress"
+      "foot actions";
+    gap: 9px 10px;
     min-height: 0;
-    padding: 16px;
+    padding: 13px;
   }
 
   .fund-head {
-    align-items: flex-start;
+    grid-area: head;
+    align-items: center;
   }
 
   .fund-card .amount {
-    font-size: 24px;
+    font-size: 23px;
   }
 
   .fund-progress {
-    height: 14px;
+    grid-area: progress;
+    height: 12px;
   }
 
   .fund-foot {
+    grid-area: foot;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.25;
+    min-width: 0;
+  }
+
+  .fund-foot span {
+    white-space: nowrap;
   }
 
   .fund-card .mini-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
   }
 
   .fund-card .mini-actions button,
   .order-actions button {
-    min-height: 42px;
+    min-height: 30px;
+    border-radius: 999px;
+  }
+
+  .fund-card .mini-actions button {
+    padding: 0 10px;
+    font-size: 12px;
+    background: rgba(242, 242, 247, 0.78);
   }
 
   .order-actions {
+    grid-area: actions;
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
