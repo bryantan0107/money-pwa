@@ -291,8 +291,8 @@ function renderFunds() {
         `
         : `
           <div class="mini-actions">
-            <button type="button" data-action="view-fund" data-id="${fund.id}">查看明细</button>
-            <button type="button" data-action="quick-expense" data-id="${fund.id}">记一笔</button>
+            <button type="button" data-action="view-fund" data-id="${fund.id}" aria-label="查看${escapeAttr(fund.name)}明细">明细</button>
+            <button type="button" data-action="quick-expense" data-id="${fund.id}" aria-label="给${escapeAttr(fund.name)}记一笔">记账</button>
           </div>
         `;
       return `
