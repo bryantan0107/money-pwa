@@ -124,6 +124,17 @@ h2 {
 
 .topbar-actions select {
   min-width: 136px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text) 50%),
+    linear-gradient(135deg, var(--text) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) 50%,
+    calc(100% - 14px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
 .import-label input {
@@ -251,6 +262,21 @@ h2 {
   text-align: right;
 }
 
+.metric-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.metric-action {
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.72);
+}
+
 .metric.income strong,
 .metric.allocated strong {
   color: var(--green);
@@ -290,6 +316,21 @@ h2 {
   min-height: 34px;
 }
 
+.fund-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fund-title-row button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
 .fund-tools {
   display: flex;
   align-items: center;
@@ -314,8 +355,8 @@ h2 {
 }
 
 .search-field input:focus {
-  border-color: rgba(0, 0, 0, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .search-field input::-webkit-search-cancel-button {
@@ -327,6 +368,7 @@ h2 {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .search-results {
@@ -355,18 +397,26 @@ h2 {
   min-height: 38px;
   padding: 0 10px;
   border: 0;
-  background: transparent;
+  background: #fff;
   box-shadow: none;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.panel-title .search-result {
+  background: #fff !important;
+  border-color: transparent !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
 }
 
 .search-result:hover,
 .search-result:focus,
 .search-result:active {
-  background: rgba(118, 118, 128, 0.12);
+  background: rgba(118, 118, 128, 0.1) !important;
   box-shadow: none;
   color: var(--text);
   outline: none;
@@ -427,8 +477,9 @@ h2 {
 }
 
 .fund-card {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(220px, 0.92fr) minmax(150px, 1fr) minmax(120px, 0.6fr) max-content;
+  grid-template-columns: minmax(220px, 0.92fr) minmax(150px, 1fr) minmax(150px, 0.72fr);
   align-items: center;
   gap: 14px;
   min-height: 92px;
@@ -444,18 +495,29 @@ h2 {
 }
 
 .fund-list.is-reordering .fund-card {
-  cursor: default;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
 }
 
 .fund-list.is-reordering .fund-card:hover {
-  background: rgba(255, 255, 255, 0.74);
+  background: #fff;
   border-color: var(--line);
-  box-shadow: none;
-  transform: none;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
 }
 
 .fund-tools.is-reordering .search-field {
   display: none;
+}
+
+.fund-card.is-dragging {
+  opacity: 0.72;
+  transform: scale(0.985);
+  border-color: rgba(0, 122, 255, 0.32);
+}
+
+.is-fund-dragging {
+  cursor: grabbing;
 }
 
 .row-main,
@@ -619,9 +681,14 @@ h2 {
 }
 
 .detail-hero {
-  padding: 24px;
+  padding: 20px 24px 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.detail-primary {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
 }
@@ -658,25 +725,32 @@ h2 {
 .detail-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 .detail-stats .metric {
-  min-height: 108px;
-  padding: 18px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px;
+  backdrop-filter: none;
 }
 
 .detail-stats .metric span {
-  font-size: 13px;
+  font-size: 11px;
+  white-space: normal;
 }
 
 .detail-stats .metric strong {
-  font-size: 30px;
+  font-size: 17px;
   font-weight: 700;
   text-align: left;
 }
@@ -704,6 +778,34 @@ th {
   font-size: 13px;
   font-weight: 600;
   background: rgba(250, 250, 252, 0.72);
+}
+
+.sort-head {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  font: inherit;
+  font-weight: inherit;
+}
+
+.sort-head:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+.sort-head.active {
+  color: var(--text);
+}
+
+.sort-arrow {
+  min-width: 10px;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .number {
@@ -871,6 +973,10 @@ menu {
     scroll-snap-align: start;
   }
 
+  .metric.left {
+    flex-basis: 182px;
+  }
+
   .metric span {
     font-size: 10px;
   }
@@ -878,6 +984,11 @@ menu {
   .metric strong {
     font-size: 13px;
     white-space: nowrap;
+  }
+
+  .metric-action {
+    min-height: 28px;
+    padding: 0 10px;
   }
 
   .backup-reminder {
@@ -905,6 +1016,16 @@ menu {
     font-size: 20px;
   }
 
+  .fund-title-row {
+    width: 100%;
+  }
+
+  .fund-title-row button {
+    min-height: 36px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
   .fund-tools {
     display: grid;
     grid-template-columns: 1fr auto auto;
@@ -926,7 +1047,7 @@ menu {
   }
 
   .detail-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .fund-list {
@@ -936,14 +1057,22 @@ menu {
   }
 
   .fund-card {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
     grid-template-areas:
-      "head head"
-      "progress progress"
-      "foot actions";
+      "head"
+      "progress"
+      "foot";
     gap: 9px 10px;
     min-height: 0;
     padding: 13px;
+  }
+
+  .fund-list.is-reordering .fund-card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "progress"
+      "foot";
   }
 
   .fund-head {
@@ -994,17 +1123,6 @@ menu {
     background: rgba(242, 242, 247, 0.78);
   }
 
-  .order-actions {
-    grid-area: actions;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .order-actions button {
-    width: 100%;
-    border-radius: 8px;
-  }
-
   .manage-grid {
     gap: 12px;
     margin-top: 12px;
@@ -1022,21 +1140,194 @@ menu {
     gap: 12px;
   }
 
+  .back-btn {
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+
   .detail-hero {
+    gap: 12px;
+    padding: 15px 16px 14px;
+  }
+
+  .detail-primary {
     align-items: flex-start;
-    flex-direction: column;
-    padding: 18px;
+    gap: 12px;
+  }
+
+  .detail-hero h2 {
+    font-size: 27px;
   }
 
   .detail-balance {
-    text-align: left;
+    flex-shrink: 0;
+    text-align: right;
   }
 
   .detail-balance strong {
-    font-size: 38px;
+    font-size: 31px;
   }
 
-  table {
-    min-width: 560px;
+  .detail-stats {
+    gap: 8px;
+    padding-top: 12px;
+  }
+
+  .detail-stats .metric {
+    min-height: 0;
+    padding: 0;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .detail-stats .metric span {
+    font-size: 10px;
+  }
+
+  .detail-stats .metric strong {
+    font-size: 15px;
+    text-align: left;
+  }
+
+  .detail-view .expense-panel {
+    margin-top: 0;
+  }
+
+  .detail-view .expense-panel .panel-title {
+    gap: 12px;
+  }
+
+  .detail-view .expense-panel .inline-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .detail-view .expense-panel .inline-actions button {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .detail-view .table-wrap {
+    overflow-x: auto;
+    padding: 0 8px 10px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .detail-view .table-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .detail-view .detail-expense-table {
+    min-width: 390px;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  .detail-view .detail-expense-table thead {
+    display: table-header-group;
+  }
+
+  .detail-view .detail-expense-table tbody {
+    display: table-row-group;
+  }
+
+  .detail-view .detail-expense-table tr {
+    display: table-row;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .detail-view .detail-expense-table th,
+  .detail-view .detail-expense-table td {
+    display: table-cell;
+    min-width: 0;
+    max-width: none;
+    padding: 10px 9px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.78);
+    font-size: 12px;
+    line-height: 1.25;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+  }
+
+  .detail-view .detail-expense-table thead th {
+    border-top: 1px solid var(--line);
+    background: rgba(246, 246, 248, 0.98);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 650;
+  }
+
+  .detail-view .detail-expense-table th:first-child,
+  .detail-view .detail-expense-table td:first-child {
+    border-left: 1px solid var(--line);
+  }
+
+  .detail-view .detail-expense-table tr:first-child th:first-child {
+    border-top-left-radius: 8px;
+  }
+
+  .detail-view .detail-expense-table tr:first-child th:last-child,
+  .detail-view .detail-expense-table tr:first-child td:last-child {
+    border-top-right-radius: 8px;
+  }
+
+  .detail-view .detail-expense-table tr:last-child td:first-child {
+    border-bottom-left-radius: 8px;
+  }
+
+  .detail-view .detail-expense-table tr:last-child td:last-child {
+    border-bottom-right-radius: 8px;
+  }
+
+  .detail-view .detail-expense-table th:nth-child(1),
+  .detail-view .detail-expense-table td:nth-child(1) {
+    width: 94px;
+  }
+
+  .detail-view .detail-expense-table th:nth-child(3),
+  .detail-view .detail-expense-table td:nth-child(3) {
+    width: 70px;
+  }
+
+  .detail-view .detail-expense-table th:nth-child(4),
+  .detail-view .detail-expense-table td:nth-child(4) {
+    width: 58px;
+  }
+
+  .detail-view .detail-expense-table .number {
+    text-align: right;
+    font-weight: 650;
+  }
+
+  .detail-view .detail-expense-table .number .sort-head {
+    margin-left: auto;
+  }
+
+  .detail-view .detail-expense-table .action-cell {
+    width: auto;
+    text-align: right;
+  }
+
+  .detail-view .detail-expense-table .action-cell button {
+    min-height: 28px;
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 0 10px;
   }
 }
