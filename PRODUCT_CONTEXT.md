@@ -47,6 +47,8 @@ This file records long-term product direction and user preferences for this proj
 - Do not use horizontal scrolling unless the user explicitly asks for it or the content truly requires it.
 - Mobile pages should never drift sideways during gestures; prevent page-level horizontal overflow by default.
 - When a modal or dialog is open, the background page must not scroll, even if the dialog content reaches the top or bottom.
+- Opening edit/add dialogs should not auto-focus text, amount, or date fields; users choose which field to edit.
+- Keep form input/select font sizes iOS-safe, so Safari/PWA does not auto-zoom when editing.
 - When in doubt, optimize for a real iPhone screen width.
 - Homepage should show only key information; details can live behind tappable cards or detail pages.
 
@@ -58,14 +60,26 @@ This file records long-term product direction and user preferences for this proj
 - `Balance Detail` pages should not show the top income summary strip.
 - `Income Storage Detail` should also behave like a separate detail page.
 - Month navigation should use a calendar-style year view with 12 month cells, not a native dropdown plus add button.
+- Month navigation should feel like a compact dropdown/popover attached to the month button, not a large centered modal.
 - Months that do not exist yet should appear greyed out; tapping them should ask before creating the month.
 - The real current month should be marked with a small underline so users can find it even while viewing another month.
 - Detail pages should support a quick left-edge right swipe to return home, with a smooth transition.
+- Returning from a detail page should restore the previous page's scroll position instead of jumping to the top.
+- Bottom tabs should remember their own scroll positions when switching between them.
 - Future bottom navigation may be useful. Tentative tabs:
   - Home
   - Records
   - Settings
 - Avoid calling a tab `Account` unless the app actually has login/account/cloud sync.
+- Bottom navigation is now part of the mobile-first direction. Keep it simple and iOS-like:
+  - Home for daily overview and available balance
+  - Records for income and expense records
+- Settings for backup, restore, currency, and future app settings
+- Detail pages should hide bottom navigation for now, so they feel like focused child screens.
+- Backup and restore belong in Settings; do not keep a duplicate top-right overflow menu for them.
+- App display language should be switchable in Settings. Current supported languages: English and Chinese.
+- The top subtitle under `Money` is not useful and should stay removed.
+- Provide a quick privacy toggle near the app title to hide displayed amounts in public; amounts should become masked text while underlying data remains unchanged.
 
 ## Current Homepage Priorities
 
@@ -80,7 +94,7 @@ This file records long-term product direction and user preferences for this proj
 - `Available Balance` is the primary daily working area.
 - Homepage should include compact `Recent Expenses`, showing about the last five updated expenses.
 - `Recent Expenses` on the homepage is a read-only reference list, not an editing surface. Keep it small, with date, category, note, and amount in compact one-line rows. Editing belongs behind `View All`.
-- `Available Balance` on the homepage can be a preview. Full search, sort, add fund, depleted group, and all fund cards can live in an extended view.
+- `Available Balance` is the main homepage list. It should always show search, sort, add fund, depleted group, and fund cards; do not use an expand/collapse control here.
 - Fund cards should be compact and mobile-readable.
 - Whole fund card can open its balance details.
 - Global `Log` is the main expense entry action.
@@ -133,6 +147,14 @@ This file records long-term product direction and user preferences for this proj
 - User prefers to preview changes locally before syncing to GitHub.
 - Do not sync to GitHub unless the user asks.
 - When updating PWA assets, bump cache/version strings so the phone can receive updates.
+- Use the formal local git checkout at `/Users/bryanyijuetan/Documents/Codex/money-pwa` for future work.
+- Preferred fast publishing workflow after local approval:
+  - make changes in the formal checkout
+  - verify locally
+  - commit directly on `main`
+  - push with `git push origin main`
+  - let GitHub Pages deploy automatically
+- Unless the user explicitly asks for a PR or separate branch, direct `main` sync is preferred for speed.
 
 ## Interaction Preferences
 

@@ -10,26 +10,28 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=recent-compact-2">
+    <link rel="stylesheet" href="styles.css?v=month-popover-1">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <h1>Money</h1>
-          <p id="monthSubtitle">Track income, funds, and expenses</p>
+          <div class="brand-row">
+            <h1>Money</h1>
+            <button id="privacyToggleBtn" class="privacy-toggle" type="button" aria-pressed="false" aria-label="Hide amounts">◎</button>
+          </div>
         </div>
         <div class="topbar-actions">
           <button id="monthSelect" class="month-select-btn" type="button" aria-label="Open month calendar">May 2026</button>
-          <div class="more-menu">
-            <button id="moreMenuBtn" class="icon-btn" type="button" aria-label="More actions" aria-expanded="false">…</button>
-            <div id="moreMenuPanel" class="more-menu-panel" hidden>
-              <button id="exportBtn" type="button">Back Up to File</button>
-              <label class="import-label">
-                Restore Backup
-                <input id="importInput" type="file" accept="application/json">
-              </label>
-            </div>
+          <div id="monthDialog" class="month-modal" hidden>
+            <section id="monthForm" class="month-card" role="dialog" aria-modal="false" aria-labelledby="monthCalendarTitle">
+              <div class="month-calendar-head">
+                <button id="prevYearBtn" type="button" aria-label="Previous year">‹</button>
+                <button id="monthCalendarTitle" class="year-btn" type="button">2026</button>
+                <button id="nextYearBtn" type="button" aria-label="Next year">›</button>
+              </div>
+              <div id="monthGrid" class="month-grid"></div>
+            </section>
           </div>
         </div>
       </header>
@@ -97,7 +99,6 @@
                 <h2>Available Balance</h2>
                 <div class="fund-primary-actions">
                   <button id="quickExpenseBtn" type="button">Log</button>
-                  <button id="toggleFundViewBtn" class="secondary-action" type="button">View All</button>
                   <button id="addFundBtn" class="add-fund-icon" type="button" aria-label="Add fund">+</button>
                 </div>
               </div>
@@ -121,15 +122,83 @@
             <div id="fundList" class="fund-list"></div>
           </section>
 
-          <section class="manage-grid">
-            <aside class="panel">
-              <div class="panel-title">
-                <h2>Income</h2>
-                <button id="addIncomeBtn" type="button">Add</button>
-              </div>
-              <div id="incomeList" class="list"></div>
-            </aside>
+        </section>
 
+        <section id="recordsView" class="tab-view" hidden>
+          <section class="panel records-panel">
+            <div class="panel-title">
+              <h2>Records</h2>
+              <div class="record-actions">
+                <label class="record-search" aria-label="Search records">
+                  <input id="recordSearchInput" type="search" placeholder="Search date, category, note, amount" autocomplete="off">
+                </label>
+                <select id="recordFilter" aria-label="Filter records"></select>
+                <div class="record-add-menu">
+                  <button id="addRecordBtn" type="button" aria-expanded="false">Add</button>
+                  <div id="addRecordMenu" class="record-add-panel" hidden>
+                    <button id="addRecordIncomeBtn" type="button">Income</button>
+                    <button id="addRecordExpenseBtn" type="button">Expense</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="records-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Note</th>
+                    <th class="number">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="recordTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="settingsView" class="tab-view" hidden>
+          <section class="panel settings-panel">
+            <div class="panel-title compact-title">
+              <h2>Settings</h2>
+            </div>
+            <div class="settings-list">
+              <article class="settings-item">
+                <div>
+                  <strong>Backup</strong>
+                  <p>Save a JSON backup file to iCloud Drive.</p>
+                </div>
+                <button id="settingsBackupBtn" type="button">Back Up</button>
+              </article>
+              <article class="settings-item">
+                <div>
+                  <strong>Restore</strong>
+                  <p>Import a backup file from this app.</p>
+                </div>
+                <label class="restore-action">
+                  Restore
+                  <input id="settingsImportInput" type="file" accept="application/json">
+                </label>
+              </article>
+              <article class="settings-item passive">
+                <div>
+                  <strong>Currency</strong>
+                  <p>Euro is the current currency.</p>
+                </div>
+                <span>€</span>
+              </article>
+              <article class="settings-item">
+                <div>
+                  <strong id="languageSettingTitle">Language</strong>
+                  <p id="languageSettingText">Choose the app display language.</p>
+                </div>
+                <select id="languageSelect" aria-label="Language">
+                  <option value="en">English</option>
+                  <option value="zh">中文</option>
+                </select>
+              </article>
+            </div>
           </section>
         </section>
 
@@ -250,35 +319,27 @@
           </section>
         </section>
 
-        <section class="panel expense-panel all-expenses-panel" hidden>
-          <div class="panel-title">
-            <h2>Expense Records</h2>
-            <div class="inline-actions">
-              <select id="expenseFilter" aria-label="Filter expense category"></select>
-              <button id="addExpenseBtn" type="button">Add Expense</button>
-            </div>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Category</th>
-                  <th>Note</th>
-                  <th class="number">Amount</th>
-                  <th class="action-cell"></th>
-                </tr>
-              </thead>
-              <tbody id="expenseTable"></tbody>
-            </table>
-          </div>
-        </section>
       </main>
+
+      <nav id="bottomNav" class="bottom-nav" aria-label="Primary navigation">
+        <button type="button" class="active" data-action="switch-tab" data-tab="home" aria-current="page">
+          <span aria-hidden="true">⌂</span>
+          <small>Home</small>
+        </button>
+        <button type="button" data-action="switch-tab" data-tab="records">
+          <span aria-hidden="true">≡</span>
+          <small>Records</small>
+        </button>
+        <button type="button" data-action="switch-tab" data-tab="settings">
+          <span aria-hidden="true">⚙</span>
+          <small>Settings</small>
+        </button>
+      </nav>
     </div>
 
     <dialog id="entryDialog">
       <form method="dialog" id="entryForm">
-        <h2 id="dialogTitle">Add</h2>
+        <h2 id="dialogTitle" tabindex="-1">Add</h2>
         <div id="formFields" class="form-fields"></div>
         <menu>
           <button value="cancel" type="button" id="cancelDialogBtn">Cancel</button>
@@ -287,19 +348,6 @@
       </form>
     </dialog>
 
-    <div id="monthDialog" class="month-modal" hidden>
-      <section id="monthForm" class="month-card" role="dialog" aria-modal="true" aria-labelledby="monthCalendarTitle">
-        <div class="month-calendar-head">
-          <button id="prevYearBtn" type="button" aria-label="Previous year">‹</button>
-          <button id="monthCalendarTitle" class="year-btn" type="button">2026</button>
-          <button id="nextYearBtn" type="button" aria-label="Next year">›</button>
-        </div>
-        <p class="dialog-note" id="monthDialogNote">Grey months have not been created yet.</p>
-        <div id="monthGrid" class="month-grid"></div>
-        <button value="cancel" type="button" id="cancelMonthBtn" class="month-close-btn">Cancel</button>
-      </section>
-    </div>
-
-    <script src="app.js?v=recent-compact-2"></script>
+    <script src="app.js?v=month-popover-1"></script>
   </body>
 </html>
