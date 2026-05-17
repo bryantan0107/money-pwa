@@ -2,6 +2,7 @@ const STORAGE_KEY = "monthly-money-manager-v2";
 const LAST_BACKUP_KEY = "monthly-money-manager-last-backup";
 const DISMISSED_BACKUP_KEY = "monthly-money-manager-backup-dismissed";
 const BACKUP_REMINDER_DAYS = 7;
+const DEFAULT_FUND_SORT = "available-desc";
 const ENGLISH_NAME_MAP = {
   "收入": "Income",
   "ptcgp收入": "PTCGP Income",
@@ -43,6 +44,7 @@ const ENGLISH_STATUS_MAP = {
 
 const initialData = {
   currentMonth: "2026-05",
+  fundSort: DEFAULT_FUND_SORT,
   months: {
     "2026-05": {
       label: "May 2026",
@@ -108,10 +110,12 @@ let state = loadState();
 let dialogMode = null;
 let editingId = null;
 let selectedFundId = null;
-let isEditingFundOrder = false;
+let showingAllocationDetail = false;
+let showingExtendedFunds = false;
 let detailSwipeStart = null;
 let detailExpenseSort = { field: "date", direction: "desc" };
-let draggedFundId = null;
+let lockedScrollY = 0;
+let monthCalendarYear = Number(state.currentMonth.slice(0, 4));
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -121,12 +125,25 @@ const els = {
   unallocatedAmount: document.querySelector("#unallocatedAmount"),
   allocateIncomeBtn: document.querySelector("#allocateIncomeBtn"),
   spentAmount: document.querySelector("#spentAmount"),
-  debtAmount: document.querySelector("#debtAmount"),
   backupReminder: document.querySelector("#backupReminder"),
   backupReminderText: document.querySelector("#backupReminderText"),
   backupNowBtn: document.querySelector("#backupNowBtn"),
   dismissBackupBtn: document.querySelector("#dismissBackupBtn"),
+  moneyDashboard: document.querySelector(".money-dashboard"),
   dashboardView: document.querySelector("#dashboardView"),
+  incomeStorageCard: document.querySelector("#incomeStorageCard"),
+  allocationDetailView: document.querySelector("#allocationDetailView"),
+  allocationSummaryText: document.querySelector("#allocationSummaryText"),
+  allocationBar: document.querySelector("#allocationBar"),
+  allocationLegend: document.querySelector("#allocationLegend"),
+  allocationDetailPercent: document.querySelector("#allocationDetailPercent"),
+  allocationDetailBar: document.querySelector("#allocationDetailBar"),
+  allocationDetailIncome: document.querySelector("#allocationDetailIncome"),
+  allocationDetailAllocated: document.querySelector("#allocationDetailAllocated"),
+  allocationDetailUnallocated: document.querySelector("#allocationDetailUnallocated"),
+  allocationDetailTable: document.querySelector("#allocationDetailTable"),
+  recentExpenseList: document.querySelector("#recentExpenseList"),
+  toggleFundViewBtn: document.querySelector("#toggleFundViewBtn"),
   detailView: document.querySelector("#detailView"),
   detailFundName: document.querySelector("#detailFundName"),
   detailBalance: document.querySelector("#detailBalance"),
@@ -136,16 +153,17 @@ const els = {
   detailExpenseTable: document.querySelector("#detailExpenseTable"),
   fundSearchInput: document.querySelector("#fundSearchInput"),
   fundSearchResults: document.querySelector("#fundSearchResults"),
-  editFundOrderBtn: document.querySelector("#editFundOrderBtn"),
+  fundSortSelect: document.querySelector("#fundSortSelect"),
+  addFundBtn: document.querySelector("#addFundBtn"),
   incomeList: document.querySelector("#incomeList"),
   fundList: document.querySelector("#fundList"),
-  debtList: document.querySelector("#debtList"),
   expenseTable: document.querySelector("#expenseTable"),
   expenseFilter: document.querySelector("#expenseFilter"),
   dialog: document.querySelector("#entryDialog"),
   monthDialog: document.querySelector("#monthDialog"),
   monthForm: document.querySelector("#monthForm"),
-  monthPicker: document.querySelector("#monthPicker"),
+  monthGrid: document.querySelector("#monthGrid"),
+  monthCalendarTitle: document.querySelector("#monthCalendarTitle"),
   monthDialogNote: document.querySelector("#monthDialogNote"),
   moreMenuBtn: document.querySelector("#moreMenuBtn"),
   moreMenuPanel: document.querySelector("#moreMenuPanel"),
@@ -154,15 +172,39 @@ const els = {
   fields: document.querySelector("#formFields")
 };
 
-document.querySelector("#newMonthBtn").addEventListener("click", openMonthDialog);
+els.monthSelect.addEventListener("click", openMonthDialog);
 document.querySelector("#addIncomeBtn").addEventListener("click", () => openDialog("income"));
+document.querySelector("#quickIncomeBtn").addEventListener("click", () => openDialog("income"));
 document.querySelector("#addFundBtn").addEventListener("click", () => openDialog("fund"));
 document.querySelector("#quickExpenseBtn").addEventListener("click", () => openDialog("expense"));
+document.querySelector("#viewAllExpensesBtn").addEventListener("click", () => {
+  document.querySelector(".all-expenses-panel").hidden = false;
+  document.querySelector(".all-expenses-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+els.toggleFundViewBtn.addEventListener("click", () => {
+  showingExtendedFunds = !showingExtendedFunds;
+  renderFunds();
+});
 els.allocateIncomeBtn.addEventListener("click", () => openDialog("allocation"));
-els.editFundOrderBtn.addEventListener("click", toggleFundOrderEdit);
-document.querySelector("#addDebtBtn").addEventListener("click", () => openDialog("debt"));
+document.querySelector("#moveFundsBtn").addEventListener("click", () => openDialog("transfer"));
 document.querySelector("#addExpenseBtn").addEventListener("click", () => openDialog("expense"));
 document.querySelector("#backToDashboardBtn").addEventListener("click", showDashboard);
+document.querySelector("#backToDashboardFromAllocationBtn").addEventListener("click", showDashboard);
+document.querySelector("#allocationDetailAddBtn").addEventListener("click", event => {
+  event.stopPropagation();
+  openDialog("allocation");
+});
+document.querySelector("#allocationDetailMoveBtn").addEventListener("click", event => {
+  event.stopPropagation();
+  openDialog("transfer");
+});
+els.incomeStorageCard.addEventListener("click", showAllocationDetail);
+els.incomeStorageCard.addEventListener("keydown", event => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    showAllocationDetail();
+  }
+});
 document.querySelector("#detailAddExpenseBtn").addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("expense", null, { category: fund.name });
@@ -176,28 +218,46 @@ document.querySelector("#importInput").addEventListener("change", importData);
 els.backupNowBtn.addEventListener("click", exportData);
 els.dismissBackupBtn.addEventListener("click", dismissBackupReminder);
 els.moreMenuBtn.addEventListener("click", toggleMoreMenu);
-document.querySelector("#cancelDialogBtn").addEventListener("click", () => els.dialog.close());
+document.querySelector("#cancelDialogBtn").addEventListener("click", closeEntryDialog);
 document.querySelector("#cancelMonthBtn").addEventListener("click", () => closeMonthDialog());
-els.monthSelect.addEventListener("change", event => {
-  state.currentMonth = event.target.value;
-  selectedFundId = null;
-  saveState();
-  render();
+document.querySelector("#prevYearBtn").addEventListener("click", () => {
+  monthCalendarYear -= 1;
+  renderMonthCalendar();
 });
+document.querySelector("#nextYearBtn").addEventListener("click", () => {
+  monthCalendarYear += 1;
+  renderMonthCalendar();
+});
+els.monthCalendarTitle.addEventListener("click", () => {
+  monthCalendarYear = Number(formatRealMonthId().slice(0, 4));
+  renderMonthCalendar();
+});
+els.monthGrid.addEventListener("click", event => {
+  const button = event.target.closest("[data-month-id]");
+  if (!button) return;
+  selectCalendarMonth(button.dataset.monthId);
+});
+els.dialog.addEventListener("close", unlockBackgroundScroll);
 els.expenseFilter.addEventListener("change", renderExpenses);
+els.fundSortSelect.addEventListener("change", event => {
+  state.fundSort = event.target.value;
+  saveState();
+  renderFunds();
+});
 els.fundSearchInput.addEventListener("input", () => {
   renderFunds();
   renderFundSearchResults();
 });
 els.fundSearchInput.addEventListener("focus", renderFundSearchResults);
 els.form.addEventListener("submit", saveEntry);
-els.monthForm.addEventListener("submit", createMonth);
-els.fundList.addEventListener("pointerdown", startFundDrag);
-document.addEventListener("pointermove", moveFundDrag);
-document.addEventListener("pointerup", finishFundDrag);
-document.addEventListener("pointercancel", finishFundDrag);
+els.form.addEventListener("input", updateAllocationEditor);
+els.form.addEventListener("change", updateAllocationEditor);
 els.detailView.addEventListener("touchstart", startDetailSwipe, { passive: true });
+els.detailView.addEventListener("touchmove", moveDetailSwipe, { passive: false });
 els.detailView.addEventListener("touchend", finishDetailSwipe, { passive: true });
+els.allocationDetailView.addEventListener("touchstart", startDetailSwipe, { passive: true });
+els.allocationDetailView.addEventListener("touchmove", moveDetailSwipe, { passive: false });
+els.allocationDetailView.addEventListener("touchend", finishDetailSwipe, { passive: true });
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -206,6 +266,7 @@ function loadState() {
   try {
     const parsed = JSON.parse(saved);
     if (!parsed.months || !parsed.currentMonth) return normalizeStateLanguage(structuredClone(initialData));
+    if (!parsed.fundSort) parsed.fundSort = DEFAULT_FUND_SORT;
     return normalizeStateLanguage(parsed);
   } catch {
     return normalizeStateLanguage(structuredClone(initialData));
@@ -213,12 +274,14 @@ function loadState() {
 }
 
 function normalizeStateLanguage(rawState) {
+  if (!rawState.fundSort) rawState.fundSort = DEFAULT_FUND_SORT;
   Object.values(rawState.months || {}).forEach(month => {
     month.incomes?.forEach(income => {
       income.name = translateName(income.name);
     });
     month.funds?.forEach(fund => {
       fund.name = translateName(fund.name);
+      fund.pinned = Boolean(fund.pinned);
     });
     month.expenses?.forEach(expense => {
       expense.category = translateName(expense.category);
@@ -253,15 +316,72 @@ function currentMonth() {
   return state.months[state.currentMonth];
 }
 
+function sortedMonthKeys() {
+  return Object.keys(state.months).sort();
+}
+
+function laterMonthKeys(monthId = state.currentMonth) {
+  return sortedMonthKeys().filter(key => key > monthId);
+}
+
+function previousMonthKey(monthId) {
+  return sortedMonthKeys().filter(key => key < monthId).pop() || null;
+}
+
+function hasLaterMonths(monthId = state.currentMonth) {
+  return laterMonthKeys(monthId).length > 0;
+}
+
+function confirmLaterMonthUpdate() {
+  if (!hasLaterMonths()) return true;
+  return window.confirm("This change affects later months. Choose OK to update later months, or Cancel to keep everything unchanged.");
+}
+
+function cascadeLaterMonthStarts(fromMonthId = state.currentMonth) {
+  const keys = sortedMonthKeys();
+  let previousKey = fromMonthId;
+  keys.filter(key => key > fromMonthId).forEach(key => {
+    const previous = state.months[previousKey];
+    const month = state.months[key];
+    month.funds.forEach(fund => {
+      const previousFund = previous.funds.find(item => item.name === fund.name);
+      if (previousFund) {
+        fund.start = balanceFor(previousFund, previous);
+      }
+    });
+    previousKey = key;
+  });
+}
+
+function finishBalanceMutation() {
+  cascadeLaterMonthStarts();
+  saveState();
+  els.dialog.close();
+  render();
+}
+
 function selectedFund() {
   return currentMonth().funds.find(fund => fund.id === selectedFundId) || null;
 }
 
 function money(value) {
-  return Number(value || 0).toLocaleString("en-US", {
+  const formatted = Number(value || 0).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+  return `€${formatted}`;
+}
+
+function formatShortDate(value) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatRealMonthId() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function sum(items, key = "amount") {
@@ -272,14 +392,14 @@ function unallocatedFor(month = currentMonth()) {
   return sum(month.incomes) - sum(month.funds, "allocation");
 }
 
-function expenseTotalFor(category) {
-  return currentMonth().expenses
+function expenseTotalFor(category, month = currentMonth()) {
+  return month.expenses
     .filter(expense => expense.category === category)
     .reduce((total, expense) => total + Number(expense.amount || 0), 0);
 }
 
-function balanceFor(fund) {
-  return Number(fund.start || 0) + Number(fund.allocation || 0) - expenseTotalFor(fund.name);
+function balanceFor(fund, month = currentMonth()) {
+  return Number(fund.start || 0) + Number(fund.allocation || 0) - expenseTotalFor(fund.name, month);
 }
 
 function fundHealth(progress) {
@@ -290,6 +410,61 @@ function fundHealth(progress) {
   return "full";
 }
 
+function fundUpdatedAt(fund) {
+  if (fund.updatedAt) return fund.updatedAt;
+  const latestExpense = currentMonth().expenses
+    .filter(expense => expense.category === fund.name)
+    .map(expense => expense.updatedAt || expense.date || "")
+    .sort()
+    .pop();
+  return latestExpense || "";
+}
+
+function sortFundCards(cards) {
+  return [...cards].sort(compareFundCards);
+}
+
+function compareFundCards(a, b) {
+  const sortMode = state.fundSort || DEFAULT_FUND_SORT;
+  if (sortMode === "available-asc") {
+    return a.balance - b.balance || a.fund.name.localeCompare(b.fund.name);
+  }
+  if (sortMode === "updated-desc") {
+    return b.updatedAt.localeCompare(a.updatedAt) || a.fund.name.localeCompare(b.fund.name);
+  }
+  if (sortMode === "updated-asc") {
+    return a.updatedAt.localeCompare(b.updatedAt) || a.fund.name.localeCompare(b.fund.name);
+  }
+  return b.balance - a.balance || a.fund.name.localeCompare(b.fund.name);
+}
+
+function allocationSegments(limit = 5) {
+  const month = currentMonth();
+  const totalIncome = sum(month.incomes);
+  const unallocated = Math.max(0, unallocatedFor(month));
+  const colors = ["#ff3b30", "#ff8a1f", "#f5c400", "#34a853", "#0071e3", "#8e8e93"];
+  const allocatedFunds = month.funds
+    .filter(fund => Number(fund.allocation || 0) > 0)
+    .sort((a, b) => Number(b.allocation || 0) - Number(a.allocation || 0));
+  const visibleFunds = allocatedFunds.slice(0, limit);
+  const otherFunds = allocatedFunds.slice(limit);
+  const segments = visibleFunds.map((fund, index) => ({
+    label: fund.name,
+    amount: Number(fund.allocation || 0),
+    color: colors[index % colors.length]
+  }));
+  const otherAmount = sum(otherFunds, "allocation");
+
+  if (otherAmount > 0) {
+    segments.push({ label: "Other", amount: otherAmount, color: "#a1a1a6" });
+  }
+  if (unallocated > 0) {
+    segments.push({ label: "Unallocated", amount: unallocated, color: "#d1d1d6", muted: true });
+  }
+
+  return { totalIncome, allocated: sum(month.funds, "allocation"), unallocated, segments };
+}
+
 function render() {
   const month = currentMonth();
   renderMonthSelect();
@@ -297,39 +472,32 @@ function render() {
 
   const totalIncome = sum(month.incomes);
   const allocated = sum(month.funds, "allocation");
-  const spent = month.expenses
-    .filter(expense => Number(expense.amount) > 0)
-    .reduce((total, expense) => total + Number(expense.amount || 0), 0);
-  const unpaidDebt = month.debts
-    .filter(debt => debt.status !== "Paid")
-    .reduce((total, debt) => total + Number(debt.amount || 0), 0);
 
   els.monthSubtitle.textContent = `${month.label}, ${month.funds.length} fund accounts, ${month.expenses.length} expenses`;
   els.totalIncome.textContent = money(totalIncome);
   els.allocatedAmount.textContent = money(allocated);
   els.unallocatedAmount.textContent = money(unallocatedFor(month));
-  els.allocateIncomeBtn.disabled = unallocatedFor(month) <= 0;
-  els.spentAmount.textContent = money(spent);
-  els.debtAmount.textContent = money(unpaidDebt);
+  els.allocateIncomeBtn.disabled = month.funds.length === 0;
 
   renderIncome();
+  renderIncomeStorage();
+  renderAllocationDetail();
+  renderRecentExpenses();
   renderFunds();
   renderFundSearchResults();
-  renderDebts();
   renderFilter();
   renderExpenses();
   renderDetail();
   renderDetailSortLabels();
   renderBackupReminder();
-  els.dashboardView.hidden = Boolean(selectedFundId);
+  els.moneyDashboard.hidden = Boolean(selectedFundId) || showingAllocationDetail;
+  els.dashboardView.hidden = Boolean(selectedFundId) || showingAllocationDetail;
   els.detailView.hidden = !selectedFundId;
+  els.allocationDetailView.hidden = !showingAllocationDetail;
 }
 
 function renderMonthSelect() {
-  const monthKeys = Object.keys(state.months).sort().reverse();
-  els.monthSelect.innerHTML = monthKeys
-    .map(key => `<option value="${key}" ${key === state.currentMonth ? "selected" : ""}>${state.months[key].label}</option>`)
-    .join("");
+  els.monthSelect.textContent = currentMonth().label;
 }
 
 function renderIncome() {
@@ -350,32 +518,128 @@ function renderIncome() {
     : `<p class="empty">No income yet.</p>`;
 }
 
+function renderIncomeStorage() {
+  const { totalIncome, allocated, segments } = allocationSegments();
+  const percent = totalIncome > 0 ? Math.min(100, Math.max(0, (allocated / totalIncome) * 100)) : 0;
+
+  els.allocationSummaryText.textContent = `${money(allocated)} of ${money(totalIncome)} allocated`;
+  els.allocationBar.innerHTML = renderAllocationBarSegments(segments, totalIncome);
+  els.allocationLegend.innerHTML = segments.length
+    ? segments.slice(0, 6).map(segment => `
+      <span class="${segment.muted ? "muted-segment" : ""}">
+        <i style="--dot:${segment.color}"></i>
+        ${escapeHtml(segment.label)}
+      </span>
+    `).join("")
+    : `<span class="muted-segment">No income yet</span>`;
+  els.allocationBar.setAttribute("aria-label", `Income allocation chart, ${Math.round(percent)}% allocated`);
+}
+
+function renderAllocationDetail() {
+  const month = currentMonth();
+  const { totalIncome, allocated, unallocated, segments } = allocationSegments(8);
+  const percent = totalIncome > 0 ? Math.min(100, Math.max(0, (allocated / totalIncome) * 100)) : 0;
+  const rows = [...month.funds]
+    .sort((a, b) => Number(b.allocation || 0) - Number(a.allocation || 0) || a.name.localeCompare(b.name));
+
+  els.allocationDetailPercent.textContent = `${Math.round(percent)}%`;
+  els.allocationDetailIncome.textContent = money(totalIncome);
+  els.allocationDetailAllocated.textContent = money(allocated);
+  els.allocationDetailUnallocated.textContent = money(unallocated);
+  els.allocationDetailBar.innerHTML = renderAllocationBarSegments(segments, totalIncome);
+  els.allocationDetailTable.innerHTML = rows.length
+    ? rows.map(fund => {
+      const allocation = Number(fund.allocation || 0);
+      const incomeShare = totalIncome > 0 ? (allocation / totalIncome) * 100 : 0;
+      return `
+        <tr>
+          <td data-label="Fund">${escapeHtml(fund.name)}</td>
+          <td class="number" data-label="Allocated">${money(allocation)}</td>
+          <td class="number" data-label="% Income">${incomeShare.toFixed(1)}%</td>
+        </tr>
+      `;
+    }).join("")
+    : `<tr><td colspan="3" class="empty">No funds yet.</td></tr>`;
+}
+
+function renderAllocationBarSegments(segments, total) {
+  if (total <= 0 || !segments.length) {
+    return `<span class="allocation-empty" style="width:100%"></span>`;
+  }
+
+  return segments.map(segment => {
+    const width = Math.max(0, (segment.amount / total) * 100);
+    return `<span title="${escapeAttr(segment.label)} ${money(segment.amount)}" style="--segment:${segment.color}; width:${width}%"></span>`;
+  }).join("");
+}
+
+function renderRecentExpenses() {
+  const expenses = [...currentMonth().expenses]
+    .sort((a, b) => {
+      const aKey = a.updatedAt || a.date || "";
+      const bKey = b.updatedAt || b.date || "";
+      return bKey.localeCompare(aKey);
+    })
+    .slice(0, 5);
+
+  els.recentExpenseList.innerHTML = expenses.length
+    ? expenses.map(expense => `
+      <div class="recent-expense">
+        <span class="recent-date">${formatShortDate(expense.date)}</span>
+        <span class="recent-main">
+          <strong>${escapeHtml(expense.category)}</strong>
+          <small>${escapeHtml(expense.note || "No note")}</small>
+        </span>
+        <strong class="recent-amount">${money(expense.amount)}</strong>
+      </div>
+    `).join("")
+    : `<p class="empty compact-empty">No recent expenses yet.</p>`;
+}
+
 function renderFunds() {
   const month = currentMonth();
-  const query = isEditingFundOrder ? "" : els.fundSearchInput.value.trim().toLowerCase();
+  const query = showingExtendedFunds ? els.fundSearchInput.value.trim().toLowerCase() : "";
   const funds = query
     ? month.funds.filter(fund => fund.name.toLowerCase().includes(query))
     : month.funds;
+  const fundCards = funds.map(fund => {
+    const spent = expenseTotalFor(fund.name);
+    const balance = balanceFor(fund);
+    const available = Number(fund.start || 0) + Number(fund.allocation || 0);
+    const progress = available > 0
+      ? Math.max(0, Math.min(100, (balance / available) * 100))
+      : 0;
+    return {
+      fund,
+      spent,
+      balance,
+      progress,
+      health: fundHealth(progress),
+      updatedAt: fundUpdatedAt(fund),
+      isDepleted: balance <= 0
+    };
+  });
+  const pinnedFunds = fundCards.filter(item => item.fund.pinned);
+  const availableFunds = sortFundCards(fundCards.filter(item => !item.fund.pinned && !item.isDepleted));
+  const depletedFunds = sortFundCards(fundCards.filter(item => !item.fund.pinned && item.isDepleted));
+  const previewFunds = [...pinnedFunds, ...availableFunds].slice(0, 5);
+  const visiblePinnedFunds = showingExtendedFunds ? pinnedFunds : previewFunds.filter(item => item.fund.pinned);
+  const visibleAvailableFunds = showingExtendedFunds
+    ? availableFunds
+    : previewFunds.filter(item => !item.fund.pinned);
 
-  els.editFundOrderBtn.textContent = isEditingFundOrder ? "Done" : "Edit";
-  els.fundSearchInput.disabled = isEditingFundOrder;
+  els.fundSortSelect.value = state.fundSort || DEFAULT_FUND_SORT;
   els.fundSearchResults.hidden = true;
-  els.fundList.classList.toggle("is-reordering", isEditingFundOrder);
-  els.editFundOrderBtn.closest(".fund-tools").classList.toggle("is-reordering", isEditingFundOrder);
+  els.toggleFundViewBtn.textContent = showingExtendedFunds ? "Show Less" : "View All";
+  els.addFundBtn.hidden = !showingExtendedFunds;
+  document.querySelector(".funds-panel").classList.toggle("is-extended", showingExtendedFunds);
 
-  els.fundList.innerHTML = funds.length
-    ? funds.map((fund, index) => {
-      const spent = expenseTotalFor(fund.name);
-      const balance = balanceFor(fund);
-      const available = Number(fund.start || 0) + Number(fund.allocation || 0);
-      const progress = available > 0
-        ? Math.max(0, Math.min(100, (balance / available) * 100))
-        : 0;
-      const health = fundHealth(progress);
+  function renderFundCard({ fund, spent, balance, progress, health, isDepleted }) {
       return `
-        <article class="fund-card health-${health} ${draggedFundId === fund.id ? "is-dragging" : ""}" data-id="${fund.id}" ${isEditingFundOrder ? `aria-label="Drag to reorder ${escapeAttr(fund.name)}"` : `data-action="view-fund"`}>
+        <article class="fund-card health-${health} ${isDepleted ? "is-depleted" : ""} ${fund.pinned ? "is-pinned" : ""}" data-id="${fund.id}" data-action="view-fund">
           <div class="fund-head">
             <span class="name">${escapeHtml(fund.name)}</span>
+            <button type="button" class="pin-btn" data-action="toggle-fund-pin" data-id="${fund.id}" aria-pressed="${fund.pinned ? "true" : "false"}" aria-label="${fund.pinned ? "Unpin" : "Pin"} ${escapeAttr(fund.name)}">${fund.pinned ? "★" : "☆"}</button>
             <span class="amount">${money(balance)}</span>
           </div>
           <div class="fund-progress" aria-label="${escapeHtml(fund.name)} balance progress ${Math.round(progress)}%">
@@ -388,7 +652,22 @@ function renderFunds() {
           </div>
         </article>
       `;
-    }).join("")
+  }
+
+  const pinnedMarkup = visiblePinnedFunds.map(renderFundCard).join("");
+  const availableMarkup = visibleAvailableFunds.map(renderFundCard).join("");
+  const depletedMarkup = showingExtendedFunds && depletedFunds.length
+    ? `
+      <div class="fund-group-label">
+        <span>Depleted</span>
+        <small>${depletedFunds.length}</small>
+      </div>
+      ${depletedFunds.map(renderFundCard).join("")}
+    `
+    : "";
+
+  els.fundList.innerHTML = fundCards.length
+    ? `${pinnedMarkup}${availableMarkup}${depletedMarkup}`
     : `<p class="empty">${month.funds.length ? "No matching fund found." : "No fund accounts yet."}</p>`;
 }
 
@@ -477,26 +756,6 @@ function renderDetailSortLabels() {
   });
 }
 
-function renderDebts() {
-  const month = currentMonth();
-  els.debtList.innerHTML = month.debts.length
-    ? month.debts.map(debt => `
-      <article class="entry">
-        <div class="row-main">
-          <span class="name">${escapeHtml(debt.person)}</span>
-          <span class="amount">${money(debt.amount)}</span>
-        </div>
-        <p class="muted">${escapeHtml(debt.note || "")} · ${escapeHtml(debt.status)}</p>
-        <div class="mini-actions">
-          <button type="button" data-action="toggle-debt" data-id="${debt.id}">${debt.status === "Paid" ? "Mark Unpaid" : "Mark Paid"}</button>
-          <button type="button" data-action="edit-debt" data-id="${debt.id}">Edit</button>
-          <button type="button" class="danger" data-action="delete-debt" data-id="${debt.id}">Delete</button>
-        </div>
-      </article>
-    `).join("")
-    : `<p class="empty">No money owed yet.</p>`;
-}
-
 function renderFilter() {
   const selected = els.expenseFilter.value;
   const options = [`<option value="All">All Categories</option>`]
@@ -539,29 +798,51 @@ document.body.addEventListener("click", event => {
   const { action, id } = button.dataset;
   if (action === "view-fund") {
     selectedFundId = id;
+    showingAllocationDetail = false;
     els.fundSearchResults.hidden = true;
     render();
     requestAnimationFrame(scrollPageTop);
   }
+  if (action === "view-allocation-detail") {
+    showAllocationDetail();
+  }
+  if (action === "open-allocation") openDialog("allocation");
+  if (action === "open-transfer") openDialog("transfer");
+  if (action === "apply-quick-allocation") applyQuickAllocationToEditor();
   if (action === "select-fund-filter") {
     els.fundSearchInput.value = button.dataset.name;
     els.fundSearchResults.hidden = true;
     renderFunds();
   }
+  if (action === "toggle-fund-pin") toggleFundPin(id);
   if (action === "edit-income") openDialog("income", id);
   if (action === "delete-income") removeItem("incomes", id);
   if (action === "edit-fund") openDialog("fund", id);
   if (action === "delete-fund") removeItem("funds", id);
-  if (action === "edit-debt") openDialog("debt", id);
-  if (action === "delete-debt") removeItem("debts", id);
-  if (action === "toggle-debt") toggleDebt(id);
   if (action === "edit-expense") openDialog("expense", id);
   if (action === "sort-detail-expenses") toggleDetailExpenseSort(button.dataset.field);
 });
 
+function toggleFundPin(id) {
+  const fund = currentMonth().funds.find(item => item.id === id);
+  if (!fund) return;
+  fund.pinned = !fund.pinned;
+  saveState();
+  renderFunds();
+}
+
 function showDashboard() {
+  resetDetailTransitions();
   selectedFundId = null;
+  showingAllocationDetail = false;
   render();
+}
+
+function showAllocationDetail() {
+  selectedFundId = null;
+  showingAllocationDetail = true;
+  render();
+  requestAnimationFrame(scrollPageTop);
 }
 
 function scrollPageTop() {
@@ -571,17 +852,33 @@ function scrollPageTop() {
 }
 
 function startDetailSwipe(event) {
-  if (!selectedFundId || event.touches.length !== 1) return;
+  if ((!selectedFundId && !showingAllocationDetail) || event.touches.length !== 1) return;
   const touch = event.touches[0];
   detailSwipeStart = {
     x: touch.clientX,
     y: touch.clientY,
-    time: Date.now()
+    time: Date.now(),
+    element: event.currentTarget,
+    startedNearLeftEdge: touch.clientX < 54,
+    lockingHorizontal: false
   };
 }
 
+function moveDetailSwipe(event) {
+  if (!detailSwipeStart || event.touches.length !== 1 || !detailSwipeStart.startedNearLeftEdge) return;
+  const touch = event.touches[0];
+  const deltaX = touch.clientX - detailSwipeStart.x;
+  const deltaY = touch.clientY - detailSwipeStart.y;
+  const mostlyHorizontal = deltaX > 12 && deltaX > Math.abs(deltaY) * 1.15;
+
+  if (mostlyHorizontal) {
+    detailSwipeStart.lockingHorizontal = true;
+    event.preventDefault();
+  }
+}
+
 function finishDetailSwipe(event) {
-  if (!detailSwipeStart || !selectedFundId || event.changedTouches.length !== 1) {
+  if (!detailSwipeStart || (!selectedFundId && !showingAllocationDetail) || event.changedTouches.length !== 1) {
     detailSwipeStart = null;
     return;
   }
@@ -590,61 +887,27 @@ function finishDetailSwipe(event) {
   const deltaX = touch.clientX - detailSwipeStart.x;
   const deltaY = touch.clientY - detailSwipeStart.y;
   const elapsed = Date.now() - detailSwipeStart.time;
-  const startedNearLeftEdge = detailSwipeStart.x < 72;
-  const isRightSwipe = deltaX > 88;
-  const mostlyHorizontal = Math.abs(deltaY) < 64 && deltaX > Math.abs(deltaY) * 1.35;
+  const surface = detailSwipeStart.element;
+  const startedNearLeftEdge = detailSwipeStart.startedNearLeftEdge;
+  const isRightSwipe = deltaX > 46;
+  const mostlyHorizontal = Math.abs(deltaY) < 72 && deltaX > Math.abs(deltaY) * 1.1;
   const reasonablyQuick = elapsed < 900;
 
   detailSwipeStart = null;
 
   if (startedNearLeftEdge && isRightSwipe && mostlyHorizontal && reasonablyQuick) {
-    showDashboard();
+    animateBackToDashboard(surface);
   }
 }
 
-function toggleFundOrderEdit() {
-  isEditingFundOrder = !isEditingFundOrder;
-  draggedFundId = null;
-  if (isEditingFundOrder) {
-    els.fundSearchInput.value = "";
-    els.fundSearchResults.hidden = true;
-  }
-  renderFunds();
+function animateBackToDashboard(surface) {
+  surface.classList.add("is-leaving");
+  window.setTimeout(showDashboard, 170);
 }
 
-function startFundDrag(event) {
-  if (!isEditingFundOrder || event.button !== 0) return;
-  const card = event.target.closest(".fund-card[data-id]");
-  if (!card) return;
-  draggedFundId = card.dataset.id;
-  document.body.classList.add("is-fund-dragging");
-  event.preventDefault();
-  renderFunds();
-}
-
-function moveFundDrag(event) {
-  if (!draggedFundId) return;
-  event.preventDefault();
-
-  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".fund-card[data-id]");
-  if (!target || target.dataset.id === draggedFundId || !els.fundList.contains(target)) return;
-
-  const funds = currentMonth().funds;
-  const fromIndex = funds.findIndex(fund => fund.id === draggedFundId);
-  const toIndex = funds.findIndex(fund => fund.id === target.dataset.id);
-  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
-
-  const [moved] = funds.splice(fromIndex, 1);
-  funds.splice(toIndex, 0, moved);
-  renderFunds();
-}
-
-function finishFundDrag() {
-  if (!draggedFundId) return;
-  draggedFundId = null;
-  document.body.classList.remove("is-fund-dragging");
-  saveState();
-  renderFunds();
+function resetDetailTransitions() {
+  els.detailView.classList.remove("is-leaving");
+  els.allocationDetailView.classList.remove("is-leaving");
 }
 
 function toggleMoreMenu() {
@@ -658,6 +921,24 @@ function closeMoreMenu() {
   els.moreMenuBtn.setAttribute("aria-expanded", "false");
 }
 
+function lockBackgroundScroll() {
+  if (document.body.classList.contains("modal-open")) return;
+  lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.style.top = `-${lockedScrollY}px`;
+  document.body.classList.add("modal-open");
+}
+
+function unlockBackgroundScroll() {
+  if (!document.body.classList.contains("modal-open")) return;
+  document.body.classList.remove("modal-open");
+  document.body.style.top = "";
+  window.scrollTo(0, lockedScrollY);
+}
+
+function closeEntryDialog() {
+  els.dialog.close();
+}
+
 function openDialog(mode, id = null, defaults = {}) {
   dialogMode = mode;
   editingId = id;
@@ -666,22 +947,26 @@ function openDialog(mode, id = null, defaults = {}) {
   const source = {
     income: month.incomes,
     fund: month.funds,
-    debt: month.debts,
     expense: month.expenses,
-    allocation: month.funds
+    allocation: month.funds,
+    transfer: month.funds
   }[mode];
   const item = id ? source.find(entry => entry.id === id) : defaults;
 
   const titles = {
     income: id ? "Edit Income" : "Add Income",
     fund: id ? "Edit Fund" : "Add Fund",
-    debt: id ? "Edit Money Owed" : "Add Money Owed",
     expense: id ? "Edit Expense" : "Add Expense",
-    allocation: "Allocate Income"
+    allocation: "Allocate Income",
+    transfer: "Move Between Funds"
   };
   els.dialogTitle.textContent = titles[mode];
+  els.dialog.dataset.mode = mode;
   els.fields.innerHTML = fieldTemplates(mode, item || {});
-  els.dialog.showModal();
+  if (!els.dialog.open) {
+    lockBackgroundScroll();
+    els.dialog.showModal();
+  }
 }
 
 function fieldTemplates(mode, item) {
@@ -701,29 +986,22 @@ function fieldTemplates(mode, item) {
     `;
   }
 
-  if (mode === "debt") {
-    return `
-      ${field("Person", "person", item.person || "", "text")}
-      ${field("Amount", "amount", item.amount || "", "number")}
-      ${field("Note", "note", item.note || "", "text")}
-      <label class="field">Status
-        <select name="status">
-          <option value="Unpaid" ${item.status !== "Paid" ? "selected" : ""}>Unpaid</option>
-          <option value="Paid" ${item.status === "Paid" ? "selected" : ""}>Paid</option>
-        </select>
-      </label>
-    `;
+  if (mode === "allocation") {
+    return renderAllocationEditor();
   }
 
-  if (mode === "allocation") {
+  if (mode === "transfer") {
     const funds = currentMonth().funds
-      .map(fund => `<option value="${fund.id}">${escapeHtml(fund.name)}</option>`)
+      .map(fund => `<option value="${fund.id}">${escapeHtml(fund.name)} · ${money(balanceFor(fund))}</option>`)
       .join("");
     return `
-      <label class="field">Fund
-        <select name="fundId">${funds}</select>
+      <label class="field">From
+        <select name="fromFundId">${funds}</select>
       </label>
-      ${field("Amount", "amount", Math.max(0, unallocatedFor()).toFixed(2), "number")}
+      <label class="field">To
+        <select name="toFundId">${funds}</select>
+      </label>
+      ${field("Amount", "amount", "", "number")}
     `;
   }
 
@@ -737,6 +1015,71 @@ function fieldTemplates(mode, item) {
     </label>
     ${field("Note", "note", item.note || "", "text")}
     ${field("Amount", "amount", item.amount || "", "number")}
+  `;
+}
+
+function renderAllocationEditor() {
+  const totalIncome = sum(currentMonth().incomes);
+  const funds = currentMonth().funds;
+  return `
+    <section class="quick-allocation-card">
+      <h3>Quick Add</h3>
+      <div class="quick-allocation-grid">
+        <label class="field compact">Fund
+          <select name="quickFundId">
+            ${funds.map(fund => `<option value="${fund.id}">${escapeHtml(fund.name)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field compact">Amount
+          <input name="quickAmount" type="text" inputmode="decimal" autocomplete="off" data-money-input>
+        </label>
+        <button type="button" data-action="apply-quick-allocation">Add</button>
+      </div>
+    </section>
+
+    <section class="allocation-editor-summary" data-total-income="${totalIncome}">
+      <article>
+        <span>Total Income</span>
+        <strong>${money(totalIncome)}</strong>
+      </article>
+      <article>
+        <span>Allocated</span>
+        <strong id="allocationEditorAllocated">${money(sum(funds, "allocation"))}</strong>
+      </article>
+      <article>
+        <span>Unallocated</span>
+        <strong id="allocationEditorUnallocated">${money(unallocatedFor())}</strong>
+      </article>
+    </section>
+
+    <div class="allocation-editor-table-wrap">
+      <table class="allocation-editor-table">
+        <thead>
+          <tr>
+            <th>Fund</th>
+            <th>Allocated</th>
+            <th>% Income</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${funds.map(fund => {
+            const allocation = Number(fund.allocation || 0);
+            const percent = totalIncome > 0 ? (allocation / totalIncome) * 100 : 0;
+            return `
+              <tr>
+                <td>${escapeHtml(fund.name)}</td>
+                <td>
+                  <input name="allocation:${fund.id}" data-allocation-input data-fund-id="${fund.id}" value="${escapeAttr(allocation.toFixed(2))}" type="text" inputmode="decimal" autocomplete="off">
+                </td>
+                <td>
+                  <input name="percent:${fund.id}" data-percent-input data-fund-id="${fund.id}" value="${escapeAttr(percent.toFixed(1))}" type="text" inputmode="decimal" autocomplete="off">
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
@@ -762,14 +1105,18 @@ function saveEntry(event) {
   const month = currentMonth();
 
   if (dialogMode === "allocation") {
-    allocateIncome(data);
+    saveAllocationEditor(data);
+    return;
+  }
+
+  if (dialogMode === "transfer") {
+    transferAllocation(data);
     return;
   }
 
   const targetMap = {
     income: "incomes",
     fund: "funds",
-    debt: "debts",
     expense: "expenses"
   };
   const key = targetMap[dialogMode];
@@ -781,37 +1128,181 @@ function saveEntry(event) {
     return;
   }
 
-  if (editingId) {
-    const index = month[key].findIndex(item => item.id === editingId);
-    month[key][index] = { ...month[key][index], ...payload };
-  } else {
-    month[key].push({ id: crypto.randomUUID(), ...payload });
+  let affectsLaterMonthStarts = dialogMode === "expense";
+  if (dialogMode === "fund" && editingId) {
+    const previous = month[key].find(item => item.id === editingId);
+    affectsLaterMonthStarts = previous && (
+      Number(previous.start || 0) !== Number(payload.start || 0) ||
+      Number(previous.allocation || 0) !== Number(payload.allocation || 0)
+    );
   }
 
+  if (affectsLaterMonthStarts && !confirmLaterMonthUpdate()) return;
+
+  if (editingId) {
+    const index = month[key].findIndex(item => item.id === editingId);
+    const previous = month[key][index];
+    month[key][index] = { ...month[key][index], ...payload };
+    if (dialogMode === "expense") {
+      markFundUpdatedByName(previous.category);
+      markFundUpdatedByName(payload.category);
+      month[key][index].updatedAt = nowStamp();
+    }
+    if (dialogMode === "fund" && (
+      Number(previous.start || 0) !== Number(payload.start || 0) ||
+      Number(previous.allocation || 0) !== Number(payload.allocation || 0)
+    )) {
+      month[key][index].updatedAt = nowStamp();
+    }
+  } else {
+    const created = { id: crypto.randomUUID(), ...payload };
+    if (dialogMode === "expense") {
+      created.updatedAt = nowStamp();
+      markFundUpdatedByName(payload.category);
+    }
+    if (dialogMode === "fund") {
+      created.updatedAt = nowStamp();
+    }
+    month[key].push(created);
+  }
+
+  if (affectsLaterMonthStarts) {
+    cascadeLaterMonthStarts();
+  }
   saveState();
   els.dialog.close();
   render();
 }
 
-function allocateIncome(data) {
+function updateAllocationEditor(event) {
+  if (dialogMode !== "allocation") return;
+  const target = event.target;
+  const totalIncome = sum(currentMonth().incomes);
+
+  if (target?.matches("[data-allocation-input]")) {
+    const amount = parseMoneyInput(target.value);
+    const percentInput = els.form.querySelector(`[data-percent-input][data-fund-id="${target.dataset.fundId}"]`);
+    if (amount !== null && percentInput) {
+      percentInput.value = totalIncome > 0 ? ((amount / totalIncome) * 100).toFixed(1) : "0.0";
+    }
+  }
+
+  if (target?.matches("[data-percent-input]")) {
+    const percent = parseMoneyInput(target.value);
+    const amountInput = els.form.querySelector(`[data-allocation-input][data-fund-id="${target.dataset.fundId}"]`);
+    if (percent !== null && amountInput) {
+      amountInput.value = totalIncome > 0 ? ((totalIncome * percent) / 100).toFixed(2) : "0.00";
+    }
+  }
+
+  refreshAllocationEditorSummary();
+}
+
+function applyQuickAllocationToEditor() {
+  if (dialogMode !== "allocation") return;
+  const data = Object.fromEntries(new FormData(els.form).entries());
+  const amount = parseMoneyInput(data.quickAmount);
+  const input = els.form.querySelector(`[data-allocation-input][data-fund-id="${data.quickFundId}"]`);
+
+  if (!input || amount === null || amount <= 0) {
+    alert("Enter a valid quick add amount.");
+    return;
+  }
+
+  const current = parseMoneyInput(input.value) || 0;
+  input.value = (current + amount).toFixed(2);
+  updateAllocationEditor({ target: input });
+  els.form.elements.quickAmount.value = "";
+}
+
+function refreshAllocationEditorSummary() {
+  const totalIncome = sum(currentMonth().incomes);
+  const allocated = allocationEditorTotal();
+  const unallocated = totalIncome - allocated;
+  const allocatedEl = els.form.querySelector("#allocationEditorAllocated");
+  const unallocatedEl = els.form.querySelector("#allocationEditorUnallocated");
+
+  if (allocatedEl) allocatedEl.textContent = money(allocated);
+  if (unallocatedEl) {
+    unallocatedEl.textContent = money(unallocated);
+    unallocatedEl.classList.toggle("is-negative", unallocated < 0);
+  }
+}
+
+function allocationEditorTotal() {
+  return [...els.form.querySelectorAll("[data-allocation-input]")]
+    .reduce((total, input) => total + (parseMoneyInput(input.value) || 0), 0);
+}
+
+function saveAllocationEditor() {
+  const updates = [];
+
+  for (const fund of currentMonth().funds) {
+    const input = els.form.querySelector(`[data-allocation-input][data-fund-id="${fund.id}"]`);
+    const amount = parseMoneyInput(input?.value);
+    if (amount === null || amount < 0) {
+      alert("Please enter valid allocation amounts.");
+      return;
+    }
+    updates.push({ fund, amount });
+  }
+
+  const totalIncome = sum(currentMonth().incomes);
+  const totalAllocated = updates.reduce((total, item) => total + item.amount, 0);
+  if (totalAllocated > totalIncome) {
+    alert(`Allocated amount is ${money(totalAllocated - totalIncome)} over your total income.`);
+    return;
+  }
+
+  const changed = updates.some(item => Number(item.fund.allocation || 0) !== item.amount);
+  if (changed && !confirmLaterMonthUpdate()) return;
+
+  updates.forEach(item => {
+    if (Number(item.fund.allocation || 0) !== item.amount) {
+      item.fund.allocation = item.amount;
+      item.fund.updatedAt = nowStamp();
+    }
+  });
+  finishBalanceMutation();
+}
+
+function transferAllocation(data) {
   const amount = parseMoneyInput(data.amount);
-  const fund = currentMonth().funds.find(item => item.id === data.fundId);
-  const available = unallocatedFor();
+  const month = currentMonth();
+  const fromFund = month.funds.find(item => item.id === data.fromFundId);
+  const toFund = month.funds.find(item => item.id === data.toFundId);
 
-  if (!fund || amount === null || amount <= 0) {
-    alert("Enter a valid amount to allocate.");
+  if (!fromFund || !toFund || fromFund.id === toFund.id || amount === null || amount <= 0) {
+    alert("Choose two different funds and enter a valid amount.");
     return;
   }
 
-  if (amount > available) {
-    alert(`You only have ${money(available)} unallocated.`);
+  const fromAvailable = balanceFor(fromFund);
+  if (amount > fromAvailable) {
+    alert(`You can move up to ${money(fromAvailable)} from ${fromFund.name}.`);
     return;
   }
 
-  fund.allocation = Number(fund.allocation || 0) + amount;
-  saveState();
-  els.dialog.close();
-  render();
+  if (!confirmLaterMonthUpdate()) return;
+
+  const allocationMove = Math.min(Number(fromFund.allocation || 0), amount);
+  const startMove = amount - allocationMove;
+  fromFund.allocation = Number(fromFund.allocation || 0) - allocationMove;
+  toFund.allocation = Number(toFund.allocation || 0) + allocationMove;
+  fromFund.start = Number(fromFund.start || 0) - startMove;
+  toFund.start = Number(toFund.start || 0) + startMove;
+  fromFund.updatedAt = nowStamp();
+  toFund.updatedAt = nowStamp();
+  finishBalanceMutation();
+}
+
+function markFundUpdatedByName(name) {
+  const fund = currentMonth().funds.find(item => item.name === name);
+  if (fund) fund.updatedAt = nowStamp();
+}
+
+function nowStamp() {
+  return new Date().toISOString();
 }
 
 function normalizePayload(mode, data) {
@@ -825,14 +1316,6 @@ function normalizePayload(mode, data) {
       start: requireMoney(data.start),
       allocation: requireMoney(data.allocation),
       target: requireMoney(data.target)
-    };
-  }
-  if (mode === "debt") {
-    return {
-      person: data.person.trim(),
-      amount: requireMoney(data.amount),
-      note: data.note.trim(),
-      status: data.status
     };
   }
   return {
@@ -898,64 +1381,102 @@ function chooseDecimalSeparator(input, lastDot, lastComma) {
 }
 
 function removeItem(key, id) {
-  currentMonth()[key] = currentMonth()[key].filter(item => item.id !== id);
-  saveState();
-  render();
-}
+  const removed = currentMonth()[key].find(item => item.id === id);
+  const affectsLaterMonthStarts = Boolean((key === "expenses" || key === "funds") && removed);
+  if (affectsLaterMonthStarts && !confirmLaterMonthUpdate()) return;
 
-function toggleDebt(id) {
-  const debt = currentMonth().debts.find(item => item.id === id);
-  debt.status = debt.status === "Paid" ? "Unpaid" : "Paid";
+  currentMonth()[key] = currentMonth()[key].filter(item => item.id !== id);
+  if (key === "expenses" && removed) {
+    markFundUpdatedByName(removed.category);
+  }
+  if (affectsLaterMonthStarts) {
+    cascadeLaterMonthStarts();
+  }
   saveState();
   render();
 }
 
 function openMonthDialog() {
-  const monthId = getNextMonthId(state.currentMonth);
-  els.monthPicker.value = monthId;
-  els.monthDialogNote.textContent = `Default: add ${formatMonthLabel(monthId)}. Balances will roll over from ${currentMonth().label}.`;
+  monthCalendarYear = Number(state.currentMonth.slice(0, 4));
+  renderMonthCalendar();
+  lockBackgroundScroll();
   els.monthDialog.hidden = false;
 }
 
 function closeMonthDialog() {
   els.monthDialog.hidden = true;
+  unlockBackgroundScroll();
 }
 
-function createMonth(event) {
-  event.preventDefault();
-  const base = currentMonth();
-  const monthId = els.monthPicker.value;
-  if (!monthId) return;
+function renderMonthCalendar() {
+  const realMonthId = formatRealMonthId();
+  const monthNames = Array.from({ length: 12 }, (_, index) =>
+    new Date(monthCalendarYear, index, 1).toLocaleString("en-US", { month: "short" })
+  );
 
+  els.monthCalendarTitle.textContent = String(monthCalendarYear);
+  els.monthDialogNote.textContent = "Grey months have not been created yet. The small line marks the real current month.";
+  els.monthGrid.innerHTML = monthNames.map((name, index) => {
+    const monthId = `${monthCalendarYear}-${String(index + 1).padStart(2, "0")}`;
+    const exists = Boolean(state.months[monthId]);
+    const selected = monthId === state.currentMonth;
+    const isCurrentRealMonth = monthId === realMonthId;
+    return `
+      <button type="button" class="month-cell ${exists ? "exists" : "is-empty"} ${selected ? "selected" : ""} ${isCurrentRealMonth ? "is-real-current" : ""}" data-month-id="${monthId}" aria-label="${exists ? "Open" : "Create"} ${formatMonthLabel(monthId)}">
+        <span>${name}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function selectCalendarMonth(monthId) {
   if (state.months[monthId]) {
-    state.currentMonth = monthId;
-    selectedFundId = null;
-    saveState();
+    switchMonth(monthId);
     closeMonthDialog();
-    render();
     return;
   }
 
+  const previousKey = previousMonthKey(monthId);
+  const message = previousKey
+    ? `Create ${formatMonthLabel(monthId)}? Starting balances will roll over from ${state.months[previousKey].label}.`
+    : `Create ${formatMonthLabel(monthId)}? No previous month exists, so balances will start from 0.`;
+
+  if (!window.confirm(message)) return;
+  createMonthRecord(monthId);
+  switchMonth(monthId);
+  closeMonthDialog();
+}
+
+function switchMonth(monthId) {
+  state.currentMonth = monthId;
+  selectedFundId = null;
+  showingAllocationDetail = false;
+  showingExtendedFunds = false;
+  saveState();
+  render();
+}
+
+function createMonthRecord(monthId) {
+  const baseKey = previousMonthKey(monthId) || state.currentMonth;
+  const base = state.months[baseKey];
+  const previousKey = previousMonthKey(monthId);
   state.months[monthId] = {
     label: formatMonthLabel(monthId),
     incomes: [],
     funds: base.funds.map(fund => ({
       id: crypto.randomUUID(),
       name: fund.name,
-      start: balanceFor(fund),
+      start: previousKey ? balanceFor(fund, state.months[previousKey]) : 0,
       allocation: 0,
-      target: Number(fund.target || 0)
+      target: Number(fund.target || 0),
+      pinned: Boolean(fund.pinned),
+      updatedAt: fund.updatedAt || ""
     })),
     expenses: [],
-    debts: base.debts
-      .filter(debt => debt.status !== "Paid")
-      .map(debt => ({ ...debt, id: crypto.randomUUID() }))
+    debts: []
   };
-  state.currentMonth = monthId;
-  selectedFundId = null;
+  cascadeLaterMonthStarts(monthId);
   saveState();
-  closeMonthDialog();
-  render();
 }
 
 function getNextMonthId(monthId) {

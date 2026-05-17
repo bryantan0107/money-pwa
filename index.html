@@ -10,18 +10,17 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=drag-reorder-2">
+    <link rel="stylesheet" href="styles.css?v=recent-compact-2">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div>
           <h1>Money</h1>
-          <p id="monthSubtitle">Track income, funds, expenses, and money owed to you</p>
+          <p id="monthSubtitle">Track income, funds, and expenses</p>
         </div>
         <div class="topbar-actions">
-          <select id="monthSelect" aria-label="Select month"></select>
-          <button id="newMonthBtn" type="button" title="Add month">+</button>
+          <button id="monthSelect" class="month-select-btn" type="button" aria-label="Open month calendar">May 2026</button>
           <div class="more-menu">
             <button id="moreMenuBtn" class="icon-btn" type="button" aria-label="More actions" aria-expanded="false">…</button>
             <div id="moreMenuPanel" class="more-menu-panel" hidden>
@@ -47,14 +46,20 @@
       </section>
 
       <main>
-        <section class="summary-grid" aria-label="Monthly overview">
+        <section class="money-dashboard" aria-label="Monthly money dashboard">
           <article class="metric income">
-            <span>Total Income</span>
-            <strong id="totalIncome">0.00</strong>
+            <div class="metric-copy">
+              <span>Total Income</span>
+              <strong id="totalIncome">0.00</strong>
+            </div>
+            <button id="quickIncomeBtn" class="metric-action" type="button">Add</button>
           </article>
           <article class="metric allocated">
-            <span>Allocated</span>
-            <strong id="allocatedAmount">0.00</strong>
+            <div class="metric-copy">
+              <span>Allocated</span>
+              <strong id="allocatedAmount">0.00</strong>
+            </div>
+            <button id="moveFundsBtn" class="metric-action" type="button">Move</button>
           </article>
           <article class="metric left">
             <div class="metric-copy">
@@ -63,30 +68,54 @@
             </div>
             <button id="allocateIncomeBtn" class="metric-action" type="button">Allocate</button>
           </article>
-          <article class="metric spent">
-            <span>Spent</span>
-            <strong id="spentAmount">0.00</strong>
-          </article>
-          <article class="metric debt">
-            <span>Owed to Me</span>
-            <strong id="debtAmount">0.00</strong>
-          </article>
         </section>
 
         <section id="dashboardView">
+          <section id="incomeStorageCard" class="panel income-storage-card" data-action="view-allocation-detail" role="button" tabindex="0" aria-label="View income allocation details">
+            <div class="storage-head">
+              <div>
+                <h2>Income Storage</h2>
+                <p id="allocationSummaryText">0.00 of 0.00 allocated</p>
+              </div>
+              <span class="chevron" aria-hidden="true">›</span>
+            </div>
+            <div id="allocationBar" class="allocation-bar" aria-label="Income allocation chart"></div>
+            <div id="allocationLegend" class="allocation-legend"></div>
+          </section>
+
+          <section class="panel recent-panel">
+            <div class="panel-title compact-title">
+              <h2>Recent Expenses</h2>
+              <button id="viewAllExpensesBtn" type="button">View All</button>
+            </div>
+            <div id="recentExpenseList" class="recent-expense-list"></div>
+          </section>
+
           <section class="panel funds-panel">
             <div class="panel-title">
               <div class="fund-title-row">
                 <h2>Available Balance</h2>
-                <button id="quickExpenseBtn" type="button">Log</button>
+                <div class="fund-primary-actions">
+                  <button id="quickExpenseBtn" type="button">Log</button>
+                  <button id="toggleFundViewBtn" class="secondary-action" type="button">View All</button>
+                  <button id="addFundBtn" class="add-fund-icon" type="button" aria-label="Add fund">+</button>
+                </div>
               </div>
               <div class="fund-tools">
                 <label class="search-field" aria-label="Search funds">
                   <input id="fundSearchInput" type="search" placeholder="Search funds" autocomplete="off">
                   <div id="fundSearchResults" class="search-results" hidden></div>
                 </label>
-                <button id="editFundOrderBtn" type="button">Edit</button>
-                <button id="addFundBtn" type="button">Add</button>
+                <label class="sort-field">
+                  <span class="sort-label">Sort</span>
+                  <span class="sort-display" aria-hidden="true">Sort</span>
+                  <select id="fundSortSelect" aria-label="Sort funds">
+                    <option value="available-desc">Most available</option>
+                    <option value="available-asc">Least available</option>
+                    <option value="updated-desc">Recently updated</option>
+                    <option value="updated-asc">Oldest updated</option>
+                  </select>
+                </label>
               </div>
             </div>
             <div id="fundList" class="fund-list"></div>
@@ -101,13 +130,59 @@
               <div id="incomeList" class="list"></div>
             </aside>
 
-            <aside class="panel">
-              <div class="panel-title">
-                <h2>Money Owed</h2>
-                <button id="addDebtBtn" type="button">Add</button>
+          </section>
+        </section>
+
+        <section id="allocationDetailView" class="detail-view" hidden>
+          <button id="backToDashboardFromAllocationBtn" type="button" class="back-btn">← Home</button>
+          <section class="panel detail-hero allocation-detail-hero">
+            <div class="detail-primary">
+              <div>
+                <p class="eyebrow">Income Allocation Detail</p>
+                <h2>Income Storage</h2>
               </div>
-              <div id="debtList" class="list"></div>
-            </aside>
+              <div class="detail-balance">
+                <span>Allocated</span>
+                <strong id="allocationDetailPercent">0%</strong>
+              </div>
+            </div>
+            <div id="allocationDetailBar" class="allocation-bar large" aria-label="Income allocation detail chart"></div>
+            <div class="detail-stats">
+              <article class="metric income">
+                <span>Total Income</span>
+                <strong id="allocationDetailIncome">0.00</strong>
+              </article>
+              <article class="metric allocated">
+                <span>Allocated</span>
+                <strong id="allocationDetailAllocated">0.00</strong>
+              </article>
+              <article class="metric left">
+                <span>Unallocated</span>
+                <strong id="allocationDetailUnallocated">0.00</strong>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel expense-panel">
+            <div class="panel-title">
+              <h2>Fund Allocation</h2>
+              <div class="inline-actions">
+                <button type="button" id="allocationDetailAddBtn" data-action="open-allocation">Allocate</button>
+                <button type="button" id="allocationDetailMoveBtn" data-action="open-transfer">Move</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="allocation-detail-table">
+                <thead>
+                  <tr>
+                    <th>Fund</th>
+                    <th class="number">Allocated</th>
+                    <th class="number">% Income</th>
+                  </tr>
+                </thead>
+                <tbody id="allocationDetailTable"></tbody>
+              </table>
+            </div>
           </section>
         </section>
 
@@ -213,21 +288,18 @@
     </dialog>
 
     <div id="monthDialog" class="month-modal" hidden>
-      <form id="monthForm" class="month-card">
-        <h2>Add Month</h2>
-        <p class="dialog-note" id="monthDialogNote">Balances will roll over from the current month.</p>
-        <div class="form-fields">
-          <label class="field">Month
-            <input id="monthPicker" name="month" type="month" required>
-          </label>
+      <section id="monthForm" class="month-card" role="dialog" aria-modal="true" aria-labelledby="monthCalendarTitle">
+        <div class="month-calendar-head">
+          <button id="prevYearBtn" type="button" aria-label="Previous year">‹</button>
+          <button id="monthCalendarTitle" class="year-btn" type="button">2026</button>
+          <button id="nextYearBtn" type="button" aria-label="Next year">›</button>
         </div>
-        <menu>
-          <button value="cancel" type="button" id="cancelMonthBtn">Cancel</button>
-          <button value="default" type="submit">Add</button>
-        </menu>
-      </form>
+        <p class="dialog-note" id="monthDialogNote">Grey months have not been created yet.</p>
+        <div id="monthGrid" class="month-grid"></div>
+        <button value="cancel" type="button" id="cancelMonthBtn" class="month-close-btn">Cancel</button>
+      </section>
     </div>
 
-    <script src="app.js?v=drag-reorder-2"></script>
+    <script src="app.js?v=recent-compact-2"></script>
   </body>
 </html>

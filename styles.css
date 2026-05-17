@@ -17,6 +17,10 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -24,6 +28,17 @@ body {
   background: var(--bg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
+body.modal-open {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+  touch-action: none;
 }
 
 button,
@@ -122,7 +137,9 @@ h2 {
   flex-wrap: wrap;
 }
 
-.topbar-actions select {
+.topbar-actions select,
+.month-select-btn,
+.sort-display {
   min-width: 136px;
   appearance: none;
   -webkit-appearance: none;
@@ -137,6 +154,13 @@ h2 {
   background-repeat: no-repeat;
 }
 
+.month-select-btn {
+  justify-content: flex-start;
+  min-width: 210px;
+  min-height: 42px;
+  background-color: rgba(255, 255, 255, 0.86);
+}
+
 .import-label input {
   display: none;
 }
@@ -145,7 +169,11 @@ h2 {
   min-width: 38px;
   padding: 0;
   font-size: 22px;
-  line-height: 1;
+  line-height: 0;
+}
+
+#moreMenuBtn {
+  padding-bottom: 5px;
 }
 
 .more-menu {
@@ -222,18 +250,20 @@ h2 {
   flex-shrink: 0;
 }
 
-.summary-grid {
+.money-dashboard {
   display: grid;
-  grid-template-columns: repeat(5, minmax(118px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 18px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+}
+
+.money-dashboard[hidden] {
+  display: none;
 }
 
 .metric {
   min-height: 42px;
-  padding: 7px 10px;
+  padding: 7px 9px;
   background: rgba(255, 255, 255, 0.52);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -302,6 +332,201 @@ h2 {
   backdrop-filter: blur(22px);
 }
 
+.income-storage-card {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.income-storage-card:hover {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.09);
+  transform: translateY(-1px);
+}
+
+.storage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.storage-head h2 {
+  font-size: 18px;
+}
+
+.storage-head p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.chevron {
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.allocation-bar {
+  display: flex;
+  width: 100%;
+  height: 20px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: rgba(242, 242, 247, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.035);
+}
+
+.allocation-bar.large {
+  height: 24px;
+}
+
+.allocation-bar span {
+  display: block;
+  min-width: 2px;
+  background: var(--segment);
+  box-shadow: inset -1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.allocation-bar span:last-child {
+  box-shadow: none;
+}
+
+.allocation-empty {
+  background: rgba(209, 209, 214, 0.8) !important;
+}
+
+.allocation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 14px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.allocation-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.allocation-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--dot);
+}
+
+.allocation-legend .muted-segment {
+  color: var(--muted);
+}
+
+.allocation-detail-hero {
+  gap: 18px;
+}
+
+.allocation-detail-table td:first-child {
+  font-weight: 650;
+}
+
+.allocation-detail-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.quick-allocation-card {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(242, 242, 247, 0.62);
+}
+
+.quick-allocation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.quick-allocation-card h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.allocation-editor-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.allocation-editor-summary article {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.allocation-editor-summary span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.allocation-editor-summary strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--green);
+}
+
+.allocation-editor-summary .is-negative {
+  color: var(--red);
+}
+
+label.field.compact {
+  gap: 5px;
+}
+
+.allocation-editor-table-wrap {
+  max-height: min(48vh, 460px);
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.allocation-editor-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.allocation-editor-table th,
+.allocation-editor-table td {
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.allocation-editor-table th:first-child,
+.allocation-editor-table td:first-child {
+  width: 42%;
+  font-weight: 650;
+}
+
+.allocation-editor-table input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .panel-title {
   padding: 20px 22px;
   min-height: 76px;
@@ -316,6 +541,85 @@ h2 {
   min-height: 34px;
 }
 
+.compact-title {
+  align-items: center;
+  flex-direction: row;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 12px 18px 6px;
+}
+
+.compact-title button,
+.secondary-action {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.compact-title button {
+  min-height: 26px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.recent-panel {
+  margin-bottom: 14px;
+}
+
+.recent-expense-list {
+  display: grid;
+  gap: 4px;
+  padding: 3px 18px 13px;
+}
+
+.recent-expense {
+  min-height: 24px;
+  padding: 1px 0;
+  background: transparent;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.recent-date,
+.recent-expense small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.recent-main {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.recent-expense strong {
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.recent-main strong,
+.recent-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-amount {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.compact-empty {
+  padding: 10px 0 2px;
+}
+
 .fund-title-row {
   display: flex;
   align-items: center;
@@ -324,11 +628,29 @@ h2 {
   min-width: 0;
 }
 
-.fund-title-row button {
+.fund-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fund-primary-actions button {
   min-height: 32px;
   padding: 0 12px;
   border-radius: 999px;
   font-size: 13px;
+}
+
+.fund-primary-actions .add-fund-icon {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.72);
+  border-color: transparent;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .fund-tools {
@@ -336,6 +658,10 @@ h2 {
   align-items: center;
   gap: 8px;
   min-width: min(430px, 58%);
+}
+
+.funds-panel:not(.is-extended) .fund-tools {
+  display: none;
 }
 
 .search-field {
@@ -360,6 +686,43 @@ h2 {
 }
 
 .search-field input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.sort-field {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-width: 104px;
+}
+
+.sort-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.sort-display {
+  min-width: 104px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.86);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  padding: 0 38px 0 12px;
+  font-size: 13px;
+  box-shadow: inset 0 0 0 1px transparent;
+}
+
+.sort-field select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
   cursor: pointer;
 }
 
@@ -445,9 +808,26 @@ h2 {
   padding: 14px;
 }
 
+.fund-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 2px 0;
+  padding: 10px 2px 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.fund-group-label small {
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .manage-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
   margin-top: 16px;
 }
@@ -494,6 +874,34 @@ h2 {
   transform: translateY(-1px);
 }
 
+.fund-card.is-depleted {
+  background: rgba(255, 255, 255, 0.52);
+  opacity: 0.78;
+}
+
+.fund-card.is-depleted .amount {
+  color: var(--muted);
+}
+
+.pin-btn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(242, 242, 247, 0.78);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 16px;
+}
+
+.pin-btn[aria-pressed="true"] {
+  color: var(--blue);
+  background: rgba(0, 113, 227, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.22);
+}
+
 .fund-list.is-reordering .fund-card {
   cursor: grab;
   user-select: none;
@@ -527,6 +935,10 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.fund-head .name {
+  flex: 1 1 auto;
 }
 
 .name {
@@ -670,10 +1082,21 @@ h2 {
 .detail-view {
   display: grid;
   gap: 16px;
+  max-width: 100%;
+  touch-action: pan-y;
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 170ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 170ms ease;
 }
 
 .detail-view[hidden] {
   display: none;
+}
+
+.detail-view.is-leaving {
+  transform: translateX(26px);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .back-btn {
@@ -828,9 +1251,16 @@ dialog {
   border-radius: 10px;
   padding: 0;
   width: min(460px, calc(100vw - 28px));
+  max-height: min(84vh, 760px);
+  overflow: hidden;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(28px);
+  overscroll-behavior: contain;
+}
+
+dialog[data-mode="allocation"] {
+  width: min(620px, calc(100vw - 20px));
 }
 
 dialog::backdrop {
@@ -845,6 +1275,8 @@ dialog::backdrop {
   place-items: center;
   padding: 20px;
   background: rgba(0, 0, 0, 0.22);
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .month-modal[hidden] {
@@ -853,14 +1285,92 @@ dialog::backdrop {
 
 .month-card {
   width: min(460px, calc(100vw - 28px));
+  max-height: min(84vh, 760px);
+  overflow-y: auto;
+  padding: 18px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(28px);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.month-calendar-head {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  gap: 8px;
+}
+
+.month-calendar-head button {
+  min-height: 38px;
+  border-radius: 999px;
+}
+
+.month-calendar-head .year-btn {
+  font-size: 20px;
+  font-weight: 700;
+  background: transparent;
+  box-shadow: none;
+}
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.month-cell {
+  position: relative;
+  min-height: 58px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--text);
+  font-weight: 650;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.month-cell.is-empty {
+  color: rgba(110, 110, 115, 0.52);
+  background: rgba(242, 242, 247, 0.52);
+}
+
+.month-cell.selected {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: none;
+}
+
+.month-cell.is-real-current::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+
+.month-close-btn {
+  width: 100%;
+  margin-top: 14px;
 }
 
 form {
   padding: 18px;
+}
+
+dialog form {
+  max-height: min(84vh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .form-fields {
@@ -926,7 +1436,7 @@ menu {
 
   .topbar-actions {
     display: grid;
-    grid-template-columns: 1fr 44px 44px;
+    grid-template-columns: 1fr 44px;
     gap: 8px;
   }
 
@@ -935,7 +1445,8 @@ menu {
     min-height: 42px;
   }
 
-  .topbar-actions select {
+  .topbar-actions select,
+  .month-select-btn {
     min-width: 0;
     width: 100%;
   }
@@ -949,32 +1460,44 @@ menu {
     width: 180px;
   }
 
-  .summary-grid {
-    display: flex;
-    margin: 0 -8px 14px;
-    padding: 0 8px 6px;
-    overflow-x: scroll;
-    overflow-y: hidden;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
+  .money-dashboard {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 14px;
+    overflow: visible;
   }
 
-  .summary-grid::-webkit-scrollbar {
-    display: none;
+  .income-storage-card {
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 15px 16px;
+  }
+
+  .storage-head h2 {
+    font-size: 17px;
+  }
+
+  .allocation-bar {
+    height: 18px;
+  }
+
+  .allocation-legend {
+    gap: 8px 12px;
+    font-size: 11px;
   }
 
   .metric {
-    flex: 0 0 136px;
-    min-height: 40px;
-    padding: 7px 9px;
+    align-items: center;
+    flex-direction: column;
+    min-height: 68px;
+    padding: 7px 8px;
     gap: 6px;
-    scroll-snap-align: start;
   }
 
-  .metric.left {
-    flex-basis: 182px;
+  .metric-copy {
+    justify-items: center;
+    gap: 3px;
   }
 
   .metric span {
@@ -982,13 +1505,16 @@ menu {
   }
 
   .metric strong {
+    text-align: center;
     font-size: 13px;
     white-space: nowrap;
   }
 
   .metric-action {
-    min-height: 28px;
-    padding: 0 10px;
+    min-height: 25px;
+    padding: 0 9px;
+    width: 100%;
+    align-self: stretch;
   }
 
   .backup-reminder {
@@ -1005,6 +1531,29 @@ menu {
     min-height: 40px;
   }
 
+  @media (max-width: 390px) {
+    .money-dashboard {
+      gap: 5px;
+    }
+
+    .metric {
+      padding: 7px 6px;
+    }
+
+    .metric span,
+    .metric-action {
+      font-size: 10px;
+    }
+
+    .metric strong {
+      font-size: 12px;
+    }
+
+    .metric-action {
+      padding: 0 7px;
+    }
+  }
+
   .panel-title {
     align-items: stretch;
     flex-direction: column;
@@ -1016,25 +1565,33 @@ menu {
     font-size: 20px;
   }
 
+  .panel-title.compact-title {
+    align-items: center;
+    flex-direction: row;
+  }
+
   .fund-title-row {
     width: 100%;
   }
 
-  .fund-title-row button {
+  .fund-primary-actions button {
     min-height: 36px;
-    padding: 0 16px;
+    padding: 0 12px;
     font-size: 14px;
+  }
+
+  .fund-primary-actions .add-fund-icon {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    font-size: 20px;
   }
 
   .fund-tools {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
     width: 100%;
     min-width: 0;
-  }
-
-  .fund-tools.is-reordering {
-    grid-template-columns: 1fr auto;
   }
 
   .search-field {
@@ -1042,8 +1599,22 @@ menu {
   }
 
   .search-field input,
-  .fund-tools button {
+  .fund-tools button,
+  .sort-display {
     min-height: 42px;
+  }
+
+  .sort-label {
+    display: none;
+  }
+
+  .sort-field,
+  .sort-display {
+    min-width: 88px;
+  }
+
+  .sort-display {
+    font-size: 12px;
   }
 
   .detail-stats {
@@ -1054,6 +1625,11 @@ menu {
     grid-template-columns: 1fr;
     gap: 8px;
     padding: 8px;
+  }
+
+  .fund-group-label {
+    margin: 6px 4px 0;
+    padding-top: 8px;
   }
 
   .fund-card {
@@ -1082,6 +1658,13 @@ menu {
 
   .fund-card .amount {
     font-size: 23px;
+  }
+
+  .pin-btn {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
   }
 
   .fund-progress {
@@ -1134,6 +1717,22 @@ menu {
 
   .row-main {
     align-items: flex-start;
+  }
+
+  .table-wrap {
+    overflow-x: hidden;
+  }
+
+  table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  th,
+  td {
+    padding: 10px 8px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
   }
 
   .detail-view {
@@ -1213,11 +1812,86 @@ menu {
     font-size: 13px;
   }
 
+  #allocationDetailView .allocation-detail-hero {
+    padding: 15px 16px 14px;
+  }
+
+  #allocationDetailView .detail-primary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #allocationDetailView .detail-hero h2 {
+    font-size: 26px;
+  }
+
+  #allocationDetailView .detail-balance {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    width: 100%;
+    text-align: left;
+  }
+
+  #allocationDetailView .detail-balance strong {
+    font-size: 28px;
+  }
+
+  #allocationDetailView .allocation-bar.large {
+    height: 18px;
+  }
+
+  #allocationDetailView .detail-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #allocationDetailView .expense-panel .inline-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #allocationDetailView .expense-panel .inline-actions button {
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  #allocationDetailView .table-wrap {
+    overflow-x: visible;
+    padding: 0 8px 10px;
+  }
+
+  #allocationDetailView .allocation-detail-table {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  #allocationDetailView .allocation-detail-table th,
+  #allocationDetailView .allocation-detail-table td {
+    padding: 10px 8px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  #allocationDetailView .allocation-detail-table th:nth-child(1),
+  #allocationDetailView .allocation-detail-table td:nth-child(1) {
+    width: 46%;
+  }
+
+  #allocationDetailView .allocation-detail-table th:nth-child(2),
+  #allocationDetailView .allocation-detail-table td:nth-child(2) {
+    width: 29%;
+  }
+
+  #allocationDetailView .allocation-detail-table th:nth-child(3),
+  #allocationDetailView .allocation-detail-table td:nth-child(3) {
+    width: 25%;
+  }
+
   .detail-view .table-wrap {
-    overflow-x: auto;
+    overflow-x: hidden;
     padding: 0 8px 10px;
     scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
   }
 
   .detail-view .table-wrap::-webkit-scrollbar {
@@ -1225,7 +1899,7 @@ menu {
   }
 
   .detail-view .detail-expense-table {
-    min-width: 390px;
+    min-width: 0;
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
@@ -1297,17 +1971,17 @@ menu {
 
   .detail-view .detail-expense-table th:nth-child(1),
   .detail-view .detail-expense-table td:nth-child(1) {
-    width: 94px;
+    width: 26%;
   }
 
   .detail-view .detail-expense-table th:nth-child(3),
   .detail-view .detail-expense-table td:nth-child(3) {
-    width: 70px;
+    width: 21%;
   }
 
   .detail-view .detail-expense-table th:nth-child(4),
   .detail-view .detail-expense-table td:nth-child(4) {
-    width: 58px;
+    width: 15%;
   }
 
   .detail-view .detail-expense-table .number {
@@ -1329,5 +2003,24 @@ menu {
     border-radius: 999px;
     font-size: 11px;
     padding: 0 10px;
+  }
+
+  .quick-allocation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .allocation-editor-summary strong {
+    font-size: 13px;
+  }
+
+  .allocation-editor-table th,
+  .allocation-editor-table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .allocation-editor-table th:first-child,
+  .allocation-editor-table td:first-child {
+    width: 38%;
   }
 }
