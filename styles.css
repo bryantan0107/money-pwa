@@ -17,6 +17,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   overflow-x: hidden;
 }
@@ -167,6 +171,31 @@ h2 {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.allocation-edit-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.allocation-edit-actions:empty {
+  display: none;
+}
+
+.panel-title .allocation-edit-actions button.secondary-action,
+.allocation-edit-actions button.secondary-action {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: transparent;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.panel-title .allocation-edit-actions button.secondary-action:hover,
+.allocation-edit-actions button.secondary-action:hover {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
 }
 
 .topbar-actions {
@@ -380,7 +409,9 @@ h2 {
 
 .allocation-bar span {
   display: block;
+  flex: 0 0 var(--width, auto);
   min-width: 2px;
+  max-width: 100%;
   background: var(--segment);
   box-shadow: inset -1px 0 rgba(255, 255, 255, 0.82);
 }
@@ -429,6 +460,22 @@ h2 {
 .allocation-detail-table {
   min-width: 0;
   table-layout: fixed;
+}
+
+.allocation-detail-table .editable-number {
+  color: var(--blue);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 113, 227, 0.25);
+  text-underline-offset: 3px;
+}
+
+.allocation-detail-table input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .quick-allocation-card {
@@ -837,10 +884,107 @@ label.field.compact {
   gap: 8px;
 }
 
-.record-search input,
-.record-actions select {
+.record-search input {
   width: 100%;
   min-height: 38px;
+}
+
+.record-filter-menu {
+  position: relative;
+}
+
+.panel-title .record-filter-btn {
+  width: 100%;
+  min-height: 38px;
+  justify-content: flex-start;
+  padding-right: 34px;
+  background-color: rgba(255, 255, 255, 0.86);
+  color: var(--text);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text) 50%),
+    linear-gradient(135deg, var(--text) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.panel-title .record-filter-btn:hover,
+.panel-title .record-filter-btn:active,
+.panel-title .record-filter-btn:focus {
+  background-color: #fff;
+  color: var(--text);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.record-filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 9;
+  width: min(260px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - 220px));
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(22px);
+  -webkit-overflow-scrolling: touch;
+}
+
+.record-filter-panel[hidden] {
+  display: none;
+}
+
+.record-filter-group {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.record-filter-group:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.record-filter-group:last-child {
+  padding-bottom: 0;
+}
+
+.record-filter-group span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  padding: 4px 10px 2px;
+}
+
+.record-filter-group button {
+  width: 100%;
+  min-height: 34px;
+  justify-content: flex-start;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+}
+
+.record-filter-group button:hover,
+.record-filter-group button.active {
+  background: rgba(118, 118, 128, 0.1);
+  box-shadow: none;
+}
+
+.record-filter-group button.active {
+  font-weight: 700;
 }
 
 .record-add-menu {
@@ -887,6 +1031,173 @@ label.field.compact {
 
 .records-table .expense-row .number {
   color: var(--red);
+}
+
+.projects-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.project-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  cursor: pointer;
+}
+
+.project-card.is-settled {
+  opacity: 0.72;
+}
+
+.project-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-card h3 {
+  margin: 2px 0 0;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.project-card-head strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.project-type {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.project-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 9px;
+}
+
+.mini-breakdown {
+  height: 9px;
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.16);
+  margin-top: 12px;
+}
+
+.project-hero .detail-primary {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+
+.project-total-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 13px;
+}
+
+.project-total-row span,
+.project-date-range {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.project-total-row strong {
+  display: block;
+  font-size: 17px;
+  margin-top: 3px;
+}
+
+.project-date-range {
+  margin-top: 10px;
+}
+
+.project-breakdown-list,
+.project-entries-list {
+  display: grid;
+  gap: 0;
+  padding: 0 12px 12px;
+}
+
+.project-breakdown-bar {
+  width: auto;
+  margin: 0 18px 12px;
+}
+
+.project-breakdown-row,
+.project-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.project-breakdown-row:first-child,
+.project-entry:first-child {
+  border-top: 0;
+}
+
+.project-breakdown-row span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.project-breakdown-row i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--dot);
+  flex: 0 0 auto;
+}
+
+.project-entry {
+  cursor: pointer;
+}
+
+.project-entry div {
+  min-width: 0;
+}
+
+.project-entry span,
+.project-entry small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.project-entry strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.project-entry small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.project-entry > div:last-child {
+  text-align: right;
 }
 
 .settings-panel {
@@ -939,13 +1250,13 @@ label.field.compact {
 .bottom-nav {
   position: fixed;
   left: 50%;
-  bottom: max(10px, env(safe-area-inset-bottom));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 4px);
   z-index: 15;
-  width: min(430px, calc(100% - 24px));
+  width: min(400px, calc(100% - 36px));
   min-height: 64px;
   padding: 7px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -1578,7 +1889,7 @@ menu {
   .app-shell {
     width: min(100% - 16px, 1360px);
     padding-top: 14px;
-    padding-bottom: 98px;
+    padding-bottom: 116px;
   }
 
   .topbar {
@@ -2003,13 +2314,35 @@ menu {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  #allocationDetailView .expense-panel .panel-title {
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
   #allocationDetailView .expense-panel .inline-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    width: auto;
+    justify-content: flex-end;
   }
 
   #allocationDetailView .expense-panel .inline-actions button {
     min-width: 0;
+    padding: 0 14px;
+  }
+
+  #allocationDetailView .allocation-edit-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #projectDetailView .project-entries-panel .inline-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #projectDetailView .project-entries-panel .inline-actions button {
+    min-width: 0;
     padding: 0 8px;
+    font-size: 12px;
   }
 
   #allocationDetailView .table-wrap {
@@ -2173,6 +2506,10 @@ menu {
 
   .record-add-menu {
     justify-self: end;
+  }
+
+  .record-filter-panel {
+    width: min(260px, calc(100vw - 28px));
   }
 
   .records-panel .table-wrap {

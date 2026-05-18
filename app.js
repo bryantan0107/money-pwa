@@ -34,8 +34,37 @@ const I18N = {
     recentlyUpdated: "Recently updated",
     oldestUpdated: "Oldest updated",
     records: "Records",
+    projects: "Projects",
+    project: "Project",
+    addProject: "Add Project",
+    editProject: "Edit Project",
+    addProjectEntry: "Add Project Entry",
+    editProjectEntry: "Edit Project Entry",
+    projectType: "Type",
+    defaultFund: "Default Fund",
+    startDate: "Start Date",
+    endDate: "End Date",
+    active: "Active",
+    settled: "Settled",
+    status: "Status",
+    totalSpent: "Total Spent",
+    fundBreakdown: "Fund Breakdown",
+    entries: "Entries",
+    settle: "Settle",
+    reopen: "Reopen",
+    noProjects: "No projects yet.",
+    noProjectEntries: "No entries yet.",
+    projectSettledNote: "This project has been settled into official expense records.",
+    settleProjectConfirm: (name, count) => `Settle ${name}? This will create ${count} official expense record${count === 1 ? "" : "s"} grouped by fund.`,
+    reopenProjectConfirm: name => `Reopen ${name}? This will remove the official expense records created by settlement.`,
+    travel: "Travel",
+    event: "Event",
+    shopping: "Shopping",
+    moving: "Moving",
     searchRecords: "Search date, category, note, amount",
     allRecords: "All Records",
+    type: "Type",
+    expenseFunds: "Expense Funds",
     income: "Income",
     expenses: "Expenses",
     settings: "Settings",
@@ -139,8 +168,37 @@ const I18N = {
     recentlyUpdated: "最近更新",
     oldestUpdated: "最早更新",
     records: "记录",
+    projects: "项目",
+    project: "项目",
+    addProject: "添加项目",
+    editProject: "编辑项目",
+    addProjectEntry: "添加项目明细",
+    editProjectEntry: "编辑项目明细",
+    projectType: "类型",
+    defaultFund: "默认基金",
+    startDate: "开始日期",
+    endDate: "结束日期",
+    active: "进行中",
+    settled: "已结算",
+    status: "状态",
+    totalSpent: "总花费",
+    fundBreakdown: "基金分布",
+    entries: "明细",
+    settle: "结算",
+    reopen: "重新打开",
+    noProjects: "还没有项目。",
+    noProjectEntries: "还没有项目明细。",
+    projectSettledNote: "这个项目已经结算为正式支出记录。",
+    settleProjectConfirm: (name, count) => `结算 ${name}？会按基金生成 ${count} 条正式支出记录。`,
+    reopenProjectConfirm: name => `重新打开 ${name}？这会删除结算时生成的正式支出记录。`,
+    travel: "旅行",
+    event: "活动",
+    shopping: "购物",
+    moving: "搬家",
     searchRecords: "搜索日期、分类、备注、金额",
     allRecords: "全部记录",
+    type: "类型",
+    expenseFunds: "支出基金",
     income: "收入",
     expenses: "支出",
     settings: "设置",
@@ -260,6 +318,7 @@ const initialData = {
   language: DEFAULT_LANGUAGE,
   privacyMode: false,
   fundSort: DEFAULT_FUND_SORT,
+  projects: [],
   months: {
     "2026-05": {
       label: "May 2026",
@@ -325,10 +384,13 @@ let state = loadState();
 let dialogMode = null;
 let editingId = null;
 let selectedFundId = null;
+let selectedProjectId = null;
 let showingAllocationDetail = false;
+let allocationDetailEditing = false;
 let activeTab = "home";
 let detailReturnTab = "home";
-const tabScrollPositions = { home: 0, records: 0, settings: 0 };
+const tabScrollPositions = { home: 0, records: 0, projects: 0, settings: 0 };
+let recordFilterValue = "All";
 let detailSwipeStart = null;
 let detailExpenseSort = { field: "date", direction: "desc" };
 let lockedScrollY = 0;
@@ -349,6 +411,7 @@ const els = {
   moneyDashboard: document.querySelector(".money-dashboard"),
   dashboardView: document.querySelector("#dashboardView"),
   recordsView: document.querySelector("#recordsView"),
+  projectsView: document.querySelector("#projectsView"),
   settingsView: document.querySelector("#settingsView"),
   bottomNav: document.querySelector("#bottomNav"),
   incomeStorageCard: document.querySelector("#incomeStorageCard"),
@@ -362,6 +425,9 @@ const els = {
   allocationDetailAllocated: document.querySelector("#allocationDetailAllocated"),
   allocationDetailUnallocated: document.querySelector("#allocationDetailUnallocated"),
   allocationDetailTable: document.querySelector("#allocationDetailTable"),
+  allocationDetailEditActions: document.querySelector("#allocationDetailEditActions"),
+  allocationDetailSaveBtn: document.querySelector("#allocationDetailSaveBtn"),
+  allocationDetailCancelBtn: document.querySelector("#allocationDetailCancelBtn"),
   recentExpenseList: document.querySelector("#recentExpenseList"),
   detailView: document.querySelector("#detailView"),
   detailFundName: document.querySelector("#detailFundName"),
@@ -377,11 +443,26 @@ const els = {
   fundList: document.querySelector("#fundList"),
   recordTable: document.querySelector("#recordTable"),
   recordSearchInput: document.querySelector("#recordSearchInput"),
-  recordFilter: document.querySelector("#recordFilter"),
+  recordFilterBtn: document.querySelector("#recordFilterBtn"),
+  recordFilterPanel: document.querySelector("#recordFilterPanel"),
   addRecordBtn: document.querySelector("#addRecordBtn"),
   addRecordMenu: document.querySelector("#addRecordMenu"),
   addRecordIncomeBtn: document.querySelector("#addRecordIncomeBtn"),
   addRecordExpenseBtn: document.querySelector("#addRecordExpenseBtn"),
+  addProjectBtn: document.querySelector("#addProjectBtn"),
+  projectsList: document.querySelector("#projectsList"),
+  projectDetailView: document.querySelector("#projectDetailView"),
+  projectDetailName: document.querySelector("#projectDetailName"),
+  projectDetailStatus: document.querySelector("#projectDetailStatus"),
+  projectDetailTotal: document.querySelector("#projectDetailTotal"),
+  projectDetailDefaultFund: document.querySelector("#projectDetailDefaultFund"),
+  projectDetailDates: document.querySelector("#projectDetailDates"),
+  projectBreakdownBar: document.querySelector("#projectBreakdownBar"),
+  projectBreakdownList: document.querySelector("#projectBreakdownList"),
+  projectEntriesList: document.querySelector("#projectEntriesList"),
+  addProjectEntryBtn: document.querySelector("#addProjectEntryBtn"),
+  editProjectBtn: document.querySelector("#editProjectBtn"),
+  settleProjectBtn: document.querySelector("#settleProjectBtn"),
   dialog: document.querySelector("#entryDialog"),
   monthDialog: document.querySelector("#monthDialog"),
   monthForm: document.querySelector("#monthForm"),
@@ -407,7 +488,7 @@ document.querySelector("#quickExpenseBtn").addEventListener("click", () => openD
 document.querySelector("#viewAllExpensesBtn").addEventListener("click", () => {
   showTab("records");
 });
-els.allocateIncomeBtn.addEventListener("click", () => openDialog("allocation"));
+els.allocateIncomeBtn.addEventListener("click", () => showAllocationDetail(false));
 document.querySelector("#moveFundsBtn").addEventListener("click", () => openDialog("transfer"));
 els.addRecordBtn.addEventListener("click", toggleAddRecordMenu);
 els.addRecordIncomeBtn.addEventListener("click", () => {
@@ -418,17 +499,28 @@ els.addRecordExpenseBtn.addEventListener("click", () => {
   closeAddRecordMenu();
   openDialog("expense");
 });
+els.addProjectBtn.addEventListener("click", () => openDialog("project"));
 document.querySelector("#backToDashboardBtn").addEventListener("click", showDashboard);
 document.querySelector("#backToDashboardFromAllocationBtn").addEventListener("click", showDashboard);
-document.querySelector("#allocationDetailAddBtn").addEventListener("click", event => {
-  event.stopPropagation();
-  openDialog("allocation");
+document.querySelector("#backToProjectsBtn").addEventListener("click", showDashboard);
+els.allocationDetailSaveBtn.addEventListener("click", saveInlineAllocationDetail);
+els.allocationDetailCancelBtn.addEventListener("click", () => {
+  allocationDetailEditing = false;
+  renderAllocationDetail();
 });
 document.querySelector("#allocationDetailMoveBtn").addEventListener("click", event => {
   event.stopPropagation();
   openDialog("transfer");
 });
-els.incomeStorageCard.addEventListener("click", showAllocationDetail);
+els.allocationDetailTable.addEventListener("click", event => {
+  if (allocationDetailEditing) return;
+  if (event.target.closest("[data-action='edit-inline-allocation']")) {
+    allocationDetailEditing = true;
+    renderAllocationDetail();
+  }
+});
+els.allocationDetailTable.addEventListener("input", updateInlineAllocationDetail);
+els.incomeStorageCard.addEventListener("click", () => showAllocationDetail(false));
 els.incomeStorageCard.addEventListener("keydown", event => {
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
@@ -443,6 +535,15 @@ document.querySelector("#detailEditFundBtn").addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("fund", fund.id);
 });
+els.addProjectEntryBtn.addEventListener("click", () => {
+  const project = selectedProject();
+  if (project && project.status !== "settled") openDialog("projectEntry", null, { fundId: project.defaultFundId });
+});
+els.editProjectBtn.addEventListener("click", () => {
+  const project = selectedProject();
+  if (project) openDialog("project", project.id);
+});
+els.settleProjectBtn.addEventListener("click", settleOrReopenProject);
 els.languageSelect.addEventListener("change", event => {
   state.language = event.target.value;
   saveState();
@@ -472,7 +573,7 @@ els.monthGrid.addEventListener("click", event => {
 });
 els.dialog.addEventListener("close", unlockBackgroundScroll);
 els.recordSearchInput.addEventListener("input", renderRecords);
-els.recordFilter.addEventListener("change", renderRecords);
+els.recordFilterBtn.addEventListener("click", toggleRecordFilterMenu);
 els.bottomNav.addEventListener("click", event => {
   const button = event.target.closest("[data-tab]");
   if (!button) return;
@@ -498,6 +599,9 @@ els.detailView.addEventListener("touchend", finishDetailSwipe, { passive: true }
 els.allocationDetailView.addEventListener("touchstart", startDetailSwipe, { passive: true });
 els.allocationDetailView.addEventListener("touchmove", moveDetailSwipe, { passive: false });
 els.allocationDetailView.addEventListener("touchend", finishDetailSwipe, { passive: true });
+els.projectDetailView.addEventListener("touchstart", startDetailSwipe, { passive: true });
+els.projectDetailView.addEventListener("touchmove", moveDetailSwipe, { passive: false });
+els.projectDetailView.addEventListener("touchend", finishDetailSwipe, { passive: true });
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -508,6 +612,7 @@ function loadState() {
     if (!parsed.months || !parsed.currentMonth) return normalizeStateLanguage(structuredClone(initialData));
     if (!parsed.fundSort) parsed.fundSort = DEFAULT_FUND_SORT;
     if (!parsed.language) parsed.language = DEFAULT_LANGUAGE;
+    if (!Array.isArray(parsed.projects)) parsed.projects = [];
     parsed.privacyMode = Boolean(parsed.privacyMode);
     return normalizeStateLanguage(parsed);
   } catch {
@@ -518,7 +623,20 @@ function loadState() {
 function normalizeStateLanguage(rawState) {
   if (!rawState.fundSort) rawState.fundSort = DEFAULT_FUND_SORT;
   if (!rawState.language) rawState.language = DEFAULT_LANGUAGE;
+  if (!Array.isArray(rawState.projects)) rawState.projects = [];
   rawState.privacyMode = Boolean(rawState.privacyMode);
+  rawState.projects.forEach(project => {
+    project.name = translateName(project.name || "");
+    project.type = project.type || "other";
+    project.status = project.status || "active";
+    project.monthId = project.monthId || rawState.currentMonth;
+    project.entries = Array.isArray(project.entries) ? project.entries : [];
+    project.settlementExpenseIds = Array.isArray(project.settlementExpenseIds) ? project.settlementExpenseIds : [];
+    project.entries.forEach(entry => {
+      entry.category = translateNote(entry.category || "");
+      entry.note = translateNote(entry.note || "");
+    });
+  });
   Object.values(rawState.months || {}).forEach(month => {
     month.incomes?.forEach(income => {
       income.name = translateName(income.name);
@@ -618,6 +736,10 @@ function selectedFund() {
   return currentMonth().funds.find(fund => fund.id === selectedFundId) || null;
 }
 
+function selectedProject() {
+  return state.projects.find(project => project.id === selectedProjectId && project.monthId === state.currentMonth) || null;
+}
+
 function money(value) {
   if (state.privacyMode) return "••••";
   const formatted = Number(value || 0).toLocaleString("en-US", {
@@ -637,6 +759,14 @@ function formatShortDate(value) {
 function formatRealMonthId() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function todayForCurrentMonth() {
+  const realMonth = formatRealMonthId();
+  if (realMonth === state.currentMonth) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  return `${state.currentMonth}-01`;
 }
 
 function sum(items, key = "amount") {
@@ -725,6 +855,7 @@ function render() {
   renderStaticLanguage();
   renderMonthSelect();
   if (selectedFundId && !selectedFund()) selectedFundId = null;
+  if (selectedProjectId && !selectedProject()) selectedProjectId = null;
 
   const totalIncome = sum(month.incomes);
   const allocated = sum(month.funds, "allocation");
@@ -741,17 +872,21 @@ function render() {
   renderFundSearchResults();
   renderRecordFilter();
   renderRecords();
+  renderProjects();
+  renderProjectDetail();
   renderDetail();
   renderDetailSortLabels();
   renderBackupReminder();
-  const inDetail = Boolean(selectedFundId) || showingAllocationDetail;
+  const inDetail = Boolean(selectedFundId) || showingAllocationDetail || Boolean(selectedProjectId);
   els.moneyDashboard.hidden = inDetail || activeTab !== "home";
   els.dashboardView.hidden = inDetail || activeTab !== "home";
   els.recordsView.hidden = inDetail || activeTab !== "records";
+  els.projectsView.hidden = inDetail || activeTab !== "projects";
   els.settingsView.hidden = inDetail || activeTab !== "settings";
   els.detailView.hidden = !selectedFundId;
   els.allocationDetailView.hidden = !showingAllocationDetail;
-  els.bottomNav.hidden = inDetail;
+  els.projectDetailView.hidden = !selectedProjectId;
+  els.bottomNav.hidden = false;
   updateBottomNav();
 }
 
@@ -796,10 +931,12 @@ function renderStaticLanguage() {
   els.addFundBtn.setAttribute("aria-label", t("addFund"));
   document.querySelector("#recordsView h2").textContent = t("records");
   els.recordSearchInput.placeholder = t("searchRecords");
-  els.recordFilter.setAttribute("aria-label", t("records"));
+  els.recordFilterBtn.setAttribute("aria-label", t("records"));
   els.addRecordBtn.textContent = t("add");
   els.addRecordIncomeBtn.textContent = t("income");
   els.addRecordExpenseBtn.textContent = t("expenses");
+  document.querySelector("#projectsView h2").textContent = t("projects");
+  els.addProjectBtn.textContent = t("add");
   document.querySelector("#settingsView h2").textContent = t("settings");
   document.querySelector("#settingsBackupBtn").textContent = t("backupNow");
   document.querySelector(".restore-action").childNodes[0].textContent = t("restore");
@@ -813,9 +950,11 @@ function renderStaticLanguage() {
   document.querySelector("#languageSettingText").textContent = t("languageText");
   document.querySelector(".bottom-nav [data-tab='home'] small").textContent = t("home");
   document.querySelector(".bottom-nav [data-tab='records'] small").textContent = t("records");
+  document.querySelector(".bottom-nav [data-tab='projects'] small").textContent = t("projects");
   document.querySelector(".bottom-nav [data-tab='settings'] small").textContent = t("settings");
   document.querySelector("#backToDashboardFromAllocationBtn").textContent = `← ${t("home")}`;
   document.querySelector("#backToDashboardBtn").textContent = `← ${t("home")}`;
+  document.querySelector("#backToProjectsBtn").textContent = `← ${t("projects")}`;
   document.querySelector("#allocationDetailView .eyebrow").textContent = t("incomeAllocationDetail");
   document.querySelector("#allocationDetailView h2").textContent = t("incomeStorage");
   document.querySelector("#allocationDetailView .detail-balance span").textContent = t("allocated");
@@ -823,8 +962,9 @@ function renderStaticLanguage() {
   document.querySelector("#allocationDetailView .detail-stats .metric.allocated span").textContent = t("allocated");
   document.querySelector("#allocationDetailView .detail-stats .metric.left span").textContent = t("unallocated");
   document.querySelector("#allocationDetailView .expense-panel h2").textContent = t("fundAllocation");
-  document.querySelector("#allocationDetailAddBtn").textContent = t("allocate");
   document.querySelector("#allocationDetailMoveBtn").textContent = t("move");
+  els.allocationDetailSaveBtn.textContent = t("save");
+  els.allocationDetailCancelBtn.textContent = t("cancel");
   document.querySelector(".allocation-detail-table th:nth-child(1)").textContent = t("fund");
   document.querySelector(".allocation-detail-table th:nth-child(2)").textContent = t("allocated");
   document.querySelector(".allocation-detail-table th:nth-child(3)").textContent = t("percentIncome");
@@ -843,6 +983,14 @@ function renderStaticLanguage() {
   document.querySelector("#entryForm menu button[type='submit']").textContent = t("save");
   document.querySelector("#prevYearBtn").setAttribute("aria-label", t("previousYear"));
   document.querySelector("#nextYearBtn").setAttribute("aria-label", t("nextYear"));
+  document.querySelector("#projectDetailView .eyebrow").textContent = t("project");
+  document.querySelector("#projectDetailView .detail-balance span").textContent = t("status");
+  document.querySelector(".project-total-row div:nth-child(1) span").textContent = t("totalSpent");
+  document.querySelector(".project-total-row div:nth-child(2) span").textContent = t("defaultFund");
+  document.querySelector(".project-breakdown-panel h2").textContent = t("fundBreakdown");
+  document.querySelector(".project-entries-panel h2").textContent = t("entries");
+  els.editProjectBtn.textContent = t("edit");
+  els.addProjectEntryBtn.textContent = t("addProjectEntry");
 }
 
 function renderIncomeStorage() {
@@ -874,15 +1022,32 @@ function renderAllocationDetail() {
   els.allocationDetailAllocated.textContent = money(allocated);
   els.allocationDetailUnallocated.textContent = money(unallocated);
   els.allocationDetailBar.innerHTML = renderAllocationBarSegments(segments, totalIncome);
+  els.allocationDetailTable.closest("table").classList.toggle("is-editing", allocationDetailEditing);
+  els.allocationDetailEditActions.hidden = !allocationDetailEditing;
+  els.allocationDetailSaveBtn.hidden = !allocationDetailEditing;
+  els.allocationDetailCancelBtn.hidden = !allocationDetailEditing;
   els.allocationDetailTable.innerHTML = rows.length
     ? rows.map(fund => {
       const allocation = Number(fund.allocation || 0);
       const incomeShare = totalIncome > 0 ? (allocation / totalIncome) * 100 : 0;
+      if (allocationDetailEditing) {
+        return `
+          <tr>
+            <td data-label="${t("fund")}">${escapeHtml(fund.name)}</td>
+            <td class="number" data-label="${t("allocated")}">
+              <input name="detail-allocation:${fund.id}" data-detail-allocation-input data-fund-id="${fund.id}" value="${escapeAttr(allocation.toFixed(2))}" type="text" inputmode="decimal" autocomplete="off">
+            </td>
+            <td class="number" data-label="${t("percentIncome")}">
+              <input name="detail-percent:${fund.id}" data-detail-percent-input data-fund-id="${fund.id}" value="${escapeAttr(incomeShare.toFixed(1))}" type="text" inputmode="decimal" autocomplete="off">
+            </td>
+          </tr>
+        `;
+      }
       return `
         <tr>
           <td data-label="${t("fund")}">${escapeHtml(fund.name)}</td>
-          <td class="number" data-label="${t("allocated")}">${money(allocation)}</td>
-          <td class="number" data-label="${t("percentIncome")}">${incomeShare.toFixed(1)}%</td>
+          <td class="number editable-number" data-action="edit-inline-allocation" data-label="${t("allocated")}">${money(allocation)}</td>
+          <td class="number editable-number" data-action="edit-inline-allocation" data-label="${t("percentIncome")}">${incomeShare.toFixed(1)}%</td>
         </tr>
       `;
     }).join("")
@@ -896,8 +1061,80 @@ function renderAllocationBarSegments(segments, total) {
 
   return segments.map(segment => {
     const width = Math.max(0, (segment.amount / total) * 100);
-    return `<span title="${escapeAttr(segment.label)} ${money(segment.amount)}" style="--segment:${segment.color}; width:${width}%"></span>`;
+    return `<span title="${escapeAttr(segment.label)} ${money(segment.amount)}" style="--segment:${segment.color}; --width:${width}%"></span>`;
   }).join("");
+}
+
+function updateInlineAllocationDetail(event) {
+  if (!allocationDetailEditing) return;
+  const target = event.target;
+  const totalIncome = sum(currentMonth().incomes);
+
+  if (target?.matches("[data-detail-allocation-input]")) {
+    const amount = parseMoneyInput(target.value);
+    const percentInput = els.allocationDetailTable.querySelector(`[data-detail-percent-input][data-fund-id="${target.dataset.fundId}"]`);
+    if (amount !== null && percentInput) {
+      percentInput.value = totalIncome > 0 ? ((amount / totalIncome) * 100).toFixed(1) : "0.0";
+    }
+  }
+
+  if (target?.matches("[data-detail-percent-input]")) {
+    const percent = parseMoneyInput(target.value);
+    const amountInput = els.allocationDetailTable.querySelector(`[data-detail-allocation-input][data-fund-id="${target.dataset.fundId}"]`);
+    if (percent !== null && amountInput) {
+      amountInput.value = totalIncome > 0 ? ((totalIncome * percent) / 100).toFixed(2) : "0.00";
+    }
+  }
+
+  refreshInlineAllocationSummary();
+}
+
+function refreshInlineAllocationSummary() {
+  const totalIncome = sum(currentMonth().incomes);
+  const allocated = [...els.allocationDetailTable.querySelectorAll("[data-detail-allocation-input]")]
+    .reduce((total, input) => total + (parseMoneyInput(input.value) || 0), 0);
+  const unallocated = totalIncome - allocated;
+  const percent = totalIncome > 0 ? Math.min(100, Math.max(0, (allocated / totalIncome) * 100)) : 0;
+  els.allocationDetailPercent.textContent = `${Math.round(percent)}%`;
+  els.allocationDetailAllocated.textContent = money(allocated);
+  els.allocationDetailUnallocated.textContent = money(unallocated);
+}
+
+function saveInlineAllocationDetail() {
+  const updates = [];
+
+  for (const fund of currentMonth().funds) {
+    const input = els.allocationDetailTable.querySelector(`[data-detail-allocation-input][data-fund-id="${fund.id}"]`);
+    const amount = parseMoneyInput(input?.value);
+    if (amount === null || amount < 0) {
+      alert(t("validAllocations"));
+      return;
+    }
+    updates.push({ fund, amount });
+  }
+
+  const totalIncome = sum(currentMonth().incomes);
+  const totalAllocated = updates.reduce((total, item) => total + item.amount, 0);
+  if (totalAllocated > totalIncome) {
+    alert(t("overAllocated", money(totalAllocated - totalIncome)));
+    return;
+  }
+
+  const changed = updates.some(item => Number(item.fund.allocation || 0) !== item.amount);
+  if (changed && !confirmLaterMonthUpdate()) return;
+
+  updates.forEach(item => {
+    if (Number(item.fund.allocation || 0) !== item.amount) {
+      item.fund.allocation = item.amount;
+      item.fund.updatedAt = nowStamp();
+    }
+  });
+  if (changed) {
+    cascadeLaterMonthStarts();
+    saveState();
+  }
+  allocationDetailEditing = false;
+  render();
 }
 
 function renderRecentExpenses() {
@@ -1075,22 +1312,28 @@ function renderDetailSortLabels() {
 }
 
 function renderRecordFilter() {
-  const selected = els.recordFilter.value || "All";
-  const categoryOptions = currentMonth().funds
-    .map(fund => `<option value="category:${escapeAttr(fund.name)}">${escapeHtml(fund.name)}</option>`);
-  els.recordFilter.innerHTML = [
-    `<option value="All">${t("allRecords")}</option>`,
-    `<option value="Income">${t("income")}</option>`,
-    `<option value="Expenses">${t("expenses")}</option>`,
-    ...categoryOptions
-  ].join("");
-
   const validValues = ["All", "Income", "Expenses", ...currentMonth().funds.map(fund => `category:${fund.name}`)];
-  els.recordFilter.value = validValues.includes(selected) ? selected : "All";
+  if (!validValues.includes(recordFilterValue)) recordFilterValue = "All";
+
+  els.recordFilterBtn.textContent = recordFilterLabel(recordFilterValue);
+  els.recordFilterPanel.innerHTML = [
+    renderRecordFilterGroup("", [
+      { value: "All", label: t("allRecords") }
+    ]),
+    renderRecordFilterGroup(t("type"), [
+      { value: "Income", label: t("income") },
+      { value: "Expenses", label: t("expenses") }
+    ]),
+    renderRecordFilterGroup(t("expenseFunds"), currentMonth().funds.map(fund => ({
+      value: `category:${fund.name}`,
+      label: fund.name
+    })))
+  ].join("");
+  els.recordFilterBtn.setAttribute("aria-expanded", String(!els.recordFilterPanel.hidden));
 }
 
 function renderRecords() {
-  const filter = els.recordFilter.value || "All";
+  const filter = recordFilterValue || "All";
   const query = els.recordSearchInput.value.trim().toLowerCase();
   const records = unifiedRecords()
     .filter(record => recordMatchesFilter(record, filter))
@@ -1107,6 +1350,38 @@ function renderRecords() {
       </tr>
     `).join("")
     : `<tr><td colspan="4" class="empty">${t("noMatchingRecords")}</td></tr>`;
+}
+
+function renderRecordFilterGroup(label, items) {
+  if (!items.length) return "";
+  return `
+    <div class="record-filter-group">
+      ${label ? `<span>${escapeHtml(label)}</span>` : ""}
+      ${items.map(item => `
+        <button type="button" class="${item.value === recordFilterValue ? "active" : ""}" data-action="set-record-filter" data-filter="${escapeAttr(item.value)}">
+          ${escapeHtml(item.label)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function recordFilterLabel(value) {
+  if (value === "Income") return t("income");
+  if (value === "Expenses") return t("expenses");
+  if (value.startsWith("category:")) return value.slice(9);
+  return t("allRecords");
+}
+
+function toggleRecordFilterMenu() {
+  const isHidden = els.recordFilterPanel.hidden;
+  els.recordFilterPanel.hidden = !isHidden;
+  els.recordFilterBtn.setAttribute("aria-expanded", String(isHidden));
+}
+
+function closeRecordFilterMenu() {
+  els.recordFilterPanel.hidden = true;
+  els.recordFilterBtn.setAttribute("aria-expanded", "false");
 }
 
 function unifiedRecords() {
@@ -1159,6 +1434,126 @@ function recordMatchesSearch(record, query) {
   return haystack.includes(query);
 }
 
+function renderProjects() {
+  const projects = state.projects.filter(project => project.monthId === state.currentMonth).sort((a, b) => {
+    const statusDiff = Number(a.status === "settled") - Number(b.status === "settled");
+    if (statusDiff !== 0) return statusDiff;
+    return (b.updatedAt || b.startDate || "").localeCompare(a.updatedAt || a.startDate || "");
+  });
+
+  els.projectsList.innerHTML = projects.length
+    ? projects.map(project => {
+      const total = projectTotal(project);
+      const breakdown = projectBreakdown(project);
+      const defaultFund = fundNameById(project.defaultFundId);
+      return `
+        <article class="project-card ${project.status === "settled" ? "is-settled" : ""}" data-action="view-project" data-id="${project.id}">
+          <div class="project-card-head">
+            <div>
+              <span class="project-type">${escapeHtml(projectTypeLabel(project.type))}</span>
+              <h3>${escapeHtml(project.name)}</h3>
+            </div>
+            <strong>${money(total)}</strong>
+          </div>
+          <div class="project-card-meta">
+            <span>${escapeHtml(projectDateRange(project))}</span>
+            <span>${escapeHtml(defaultFund || "-")}</span>
+            <span>${project.status === "settled" ? t("settled") : t("active")}</span>
+          </div>
+          <div class="mini-breakdown">${renderAllocationBarSegments(breakdown, total)}</div>
+        </article>
+      `;
+    }).join("")
+    : `<p class="empty">${t("noProjects")}</p>`;
+}
+
+function renderProjectDetail() {
+  const project = selectedProject();
+  if (!project) return;
+
+  const total = projectTotal(project);
+  const breakdown = projectBreakdown(project);
+  const isSettled = project.status === "settled";
+  const entries = [...project.entries].sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
+
+  els.projectDetailName.textContent = project.name;
+  els.projectDetailStatus.textContent = isSettled ? t("settled") : t("active");
+  els.projectDetailTotal.textContent = money(total);
+  els.projectDetailDefaultFund.textContent = fundNameById(project.defaultFundId) || "-";
+  els.projectDetailDates.textContent = projectDateRange(project);
+  els.projectBreakdownBar.innerHTML = renderAllocationBarSegments(breakdown, total);
+  els.projectBreakdownList.innerHTML = breakdown.length
+    ? breakdown.map(item => `
+      <div class="project-breakdown-row">
+        <span><i style="--dot:${item.color}"></i>${escapeHtml(item.label)}</span>
+        <strong>${money(item.amount)}</strong>
+      </div>
+    `).join("")
+    : `<p class="empty compact-empty">${t("noProjectEntries")}</p>`;
+  els.addProjectEntryBtn.hidden = isSettled;
+  els.settleProjectBtn.textContent = isSettled ? t("reopen") : t("settle");
+  els.settleProjectBtn.disabled = !isSettled && total <= 0;
+
+  els.projectEntriesList.innerHTML = entries.length
+    ? entries.map(entry => `
+      <article class="project-entry clickable-row" data-action="edit-project-entry" data-id="${entry.id}" data-kind="projectEntry" tabindex="0">
+        <div>
+          <span>${escapeHtml(formatShortDate(entry.date))}</span>
+          <strong>${escapeHtml(entry.category || t("expenses"))}</strong>
+          <small>${escapeHtml(entry.note || "")}</small>
+        </div>
+        <div>
+          <strong>${money(entry.amount)}</strong>
+          <small>${escapeHtml(fundNameById(entry.fundId) || "-")}</small>
+        </div>
+      </article>
+    `).join("")
+    : `<p class="empty">${isSettled ? t("projectSettledNote") : t("noProjectEntries")}</p>`;
+}
+
+function projectTotal(project) {
+  return project.entries.reduce((total, entry) => total + Number(entry.amount || 0), 0);
+}
+
+function projectBreakdown(project) {
+  const colors = ["#ff3b30", "#ff8a1f", "#f5c400", "#34a853", "#0071e3", "#8e8e93"];
+  const totals = new Map();
+  project.entries.forEach(entry => {
+    const key = entry.fundId || project.defaultFundId || "";
+    totals.set(key, (totals.get(key) || 0) + Number(entry.amount || 0));
+  });
+  return [...totals.entries()]
+    .filter(([, amount]) => amount > 0)
+    .map(([fundId, amount], index) => ({
+      label: fundNameById(fundId) || t("other"),
+      amount,
+      fundId,
+      color: colors[index % colors.length]
+    }));
+}
+
+function fundNameById(id) {
+  return currentMonth().funds.find(fund => fund.id === id)?.name || "";
+}
+
+function projectTypeLabel(type) {
+  const labels = {
+    travel: t("travel"),
+    event: t("event"),
+    shopping: t("shopping"),
+    moving: t("moving"),
+    other: t("other")
+  };
+  return labels[type] || labels.other;
+}
+
+function projectDateRange(project) {
+  if (project.startDate && project.endDate && project.startDate !== project.endDate) {
+    return `${formatShortDate(project.startDate)} - ${formatShortDate(project.endDate)}`;
+  }
+  return formatShortDate(project.startDate || project.endDate || "");
+}
+
 document.body.addEventListener("click", event => {
   const button = event.target.closest("[data-action]");
   if (!event.target.closest(".search-field")) {
@@ -1167,6 +1562,9 @@ document.body.addEventListener("click", event => {
   if (!event.target.closest(".record-add-menu")) {
     closeAddRecordMenu();
   }
+  if (!event.target.closest(".record-filter-menu")) {
+    closeRecordFilterMenu();
+  }
   if (!els.monthDialog.hidden && !event.target.closest("#monthForm") && !event.target.closest("#monthSelect")) {
     closeMonthDialog();
   }
@@ -1174,16 +1572,31 @@ document.body.addEventListener("click", event => {
 
   const { action, id } = button.dataset;
   if (action === "switch-tab") showTab(button.dataset.tab);
+  if (action === "set-record-filter") {
+    recordFilterValue = button.dataset.filter || "All";
+    closeRecordFilterMenu();
+    renderRecordFilter();
+    renderRecords();
+  }
   if (action === "view-fund") {
     enterDetailFromCurrentTab();
     selectedFundId = id;
     showingAllocationDetail = false;
+    allocationDetailEditing = false;
     els.fundSearchResults.hidden = true;
     render();
     requestAnimationFrame(scrollPageTop);
   }
   if (action === "view-allocation-detail") {
-    showAllocationDetail();
+    showAllocationDetail(false);
+  }
+  if (action === "view-project") {
+    enterDetailFromCurrentTab();
+    selectedProjectId = id;
+    selectedFundId = null;
+    showingAllocationDetail = false;
+    render();
+    requestAnimationFrame(scrollPageTop);
   }
   if (action === "open-allocation") openDialog("allocation");
   if (action === "open-transfer") openDialog("transfer");
@@ -1200,14 +1613,16 @@ document.body.addEventListener("click", event => {
   if (action === "edit-fund") openDialog("fund", id);
   if (action === "delete-fund") removeItem("funds", id);
   if (action === "edit-expense") openDialog("expense", id);
+  if (action === "edit-project-entry" && selectedProject()?.status !== "settled") openDialog("projectEntry", id);
   if (action === "sort-detail-expenses") toggleDetailExpenseSort(button.dataset.field);
 });
 
 document.body.addEventListener("keydown", event => {
-  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense']");
+  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-project-entry']");
   if (!row || !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
-  openDialog(row.dataset.kind || "expense", row.dataset.id);
+  if (row.dataset.action === "edit-project-entry" && selectedProject()?.status === "settled") return;
+  openDialog(row.dataset.kind || (row.dataset.action === "edit-project-entry" ? "projectEntry" : "expense"), row.dataset.id);
 });
 
 function toggleFundPin(id) {
@@ -1222,27 +1637,32 @@ function showDashboard() {
   resetDetailTransitions();
   const returnTab = detailReturnTab || "home";
   selectedFundId = null;
+  selectedProjectId = null;
+  allocationDetailEditing = false;
   showingAllocationDetail = false;
   activeTab = returnTab;
   render();
   restoreTabScroll(returnTab);
 }
 
-function showAllocationDetail() {
+function showAllocationDetail(edit = false) {
   if (!selectedFundId && !showingAllocationDetail) {
     enterDetailFromCurrentTab();
   }
   selectedFundId = null;
   showingAllocationDetail = true;
+  allocationDetailEditing = Boolean(edit);
   render();
   requestAnimationFrame(scrollPageTop);
 }
 
 function showTab(tab) {
-  const nextTab = ["home", "records", "settings"].includes(tab) ? tab : "home";
+  const nextTab = ["home", "records", "projects", "settings"].includes(tab) ? tab : "home";
   saveActiveTabScroll();
   activeTab = nextTab;
   selectedFundId = null;
+  selectedProjectId = null;
+  allocationDetailEditing = false;
   showingAllocationDetail = false;
   render();
   restoreTabScroll(nextTab);
@@ -1271,7 +1691,7 @@ function currentScrollY() {
 }
 
 function saveActiveTabScroll() {
-  if (selectedFundId || showingAllocationDetail) return;
+  if (selectedFundId || showingAllocationDetail || selectedProjectId) return;
   tabScrollPositions[activeTab] = currentScrollY();
 }
 
@@ -1290,7 +1710,7 @@ function restoreTabScroll(tab) {
 }
 
 function startDetailSwipe(event) {
-  if ((!selectedFundId && !showingAllocationDetail) || event.touches.length !== 1) return;
+  if ((!selectedFundId && !showingAllocationDetail && !selectedProjectId) || event.touches.length !== 1) return;
   const touch = event.touches[0];
   detailSwipeStart = {
     x: touch.clientX,
@@ -1316,7 +1736,7 @@ function moveDetailSwipe(event) {
 }
 
 function finishDetailSwipe(event) {
-  if (!detailSwipeStart || (!selectedFundId && !showingAllocationDetail) || event.changedTouches.length !== 1) {
+  if (!detailSwipeStart || (!selectedFundId && !showingAllocationDetail && !selectedProjectId) || event.changedTouches.length !== 1) {
     detailSwipeStart = null;
     return;
   }
@@ -1346,6 +1766,7 @@ function animateBackToDashboard(surface) {
 function resetDetailTransitions() {
   els.detailView.classList.remove("is-leaving");
   els.allocationDetailView.classList.remove("is-leaving");
+  els.projectDetailView.classList.remove("is-leaving");
 }
 
 function toggleAddRecordMenu() {
@@ -1386,6 +1807,8 @@ function openDialog(mode, id = null, defaults = {}) {
     income: month.incomes,
     fund: month.funds,
     expense: month.expenses,
+    project: state.projects,
+    projectEntry: selectedProject()?.entries || [],
     allocation: month.funds,
     transfer: month.funds
   }[mode];
@@ -1395,6 +1818,8 @@ function openDialog(mode, id = null, defaults = {}) {
     income: id ? t("editIncome") : t("addIncome"),
     fund: id ? t("editFundDialog") : t("addFundDialog"),
     expense: id ? t("editExpense") : t("addExpense"),
+    project: id ? t("editProject") : t("addProject"),
+    projectEntry: id ? t("editProjectEntry") : t("addProjectEntry"),
     allocation: t("allocateIncome"),
     transfer: t("moveFunds")
   };
@@ -1431,6 +1856,42 @@ function fieldTemplates(mode, item) {
       ${field(t("startingBalance"), "start", item.start || 0, "number")}
       ${field(t("monthlyAllocation"), "allocation", item.allocation || 0, "number")}
       ${field(t("targetAmount"), "target", item.target || 0, "number")}
+    `;
+  }
+
+  if (mode === "project") {
+    const funds = currentMonth().funds
+      .map(fund => `<option value="${fund.id}" ${item.defaultFundId === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
+      .join("");
+    const types = ["travel", "event", "shopping", "moving", "other"]
+      .map(type => `<option value="${type}" ${item.type === type ? "selected" : ""}>${escapeHtml(projectTypeLabel(type))}</option>`)
+      .join("");
+    return `
+      ${field(t("name"), "name", item.name || "", "text")}
+      <label class="field">${t("projectType")}
+        <select name="type">${types}</select>
+      </label>
+      <label class="field">${t("defaultFund")}
+        <select name="defaultFundId">${funds}</select>
+      </label>
+      ${field(t("startDate"), "startDate", item.startDate || state.currentMonth + "-01", "date")}
+      ${field(t("endDate"), "endDate", item.endDate || state.currentMonth + "-01", "date")}
+    `;
+  }
+
+  if (mode === "projectEntry") {
+    const project = selectedProject();
+    const funds = currentMonth().funds
+      .map(fund => `<option value="${fund.id}" ${(item.fundId || project?.defaultFundId) === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
+      .join("");
+    return `
+      ${field(t("date"), "date", item.date || todayForCurrentMonth(), "date")}
+      <label class="field">${t("fund")}
+        <select name="fundId">${funds}</select>
+      </label>
+      ${field(t("category"), "category", item.category || "", "text")}
+      ${field(t("note"), "note", item.note || "", "text")}
+      ${field(t("amount"), "amount", item.amount || "", "number")}
     `;
   }
 
@@ -1559,6 +2020,16 @@ function saveEntry(event) {
 
   if (dialogMode === "transfer") {
     transferAllocation(data);
+    return;
+  }
+
+  if (dialogMode === "project") {
+    saveProject(data);
+    return;
+  }
+
+  if (dialogMode === "projectEntry") {
+    saveProjectEntry(data);
     return;
   }
 
@@ -1744,6 +2215,139 @@ function transferAllocation(data) {
   finishBalanceMutation();
 }
 
+function saveProject(data) {
+  const payload = {
+    name: data.name.trim(),
+    type: data.type || "other",
+    defaultFundId: data.defaultFundId,
+    startDate: data.startDate,
+    endDate: data.endDate
+  };
+
+  if (!payload.name || !payload.defaultFundId) return;
+
+  if (editingId) {
+    const project = state.projects.find(item => item.id === editingId);
+    if (project) {
+      Object.assign(project, payload, { updatedAt: nowStamp() });
+    }
+  } else {
+    const project = {
+      id: crypto.randomUUID(),
+      ...payload,
+      monthId: state.currentMonth,
+      status: "active",
+      entries: [],
+      settlementExpenseIds: [],
+      createdAt: nowStamp(),
+      updatedAt: nowStamp()
+    };
+    state.projects.push(project);
+    selectedProjectId = project.id;
+    detailReturnTab = "projects";
+    activeTab = "projects";
+  }
+
+  saveState();
+  els.dialog.close();
+  render();
+}
+
+function saveProjectEntry(data) {
+  const project = selectedProject();
+  if (!project || project.status === "settled") return;
+
+  const amount = parseMoneyInput(data.amount);
+  if (amount === null || amount <= 0) {
+    alert(t("validAmount"));
+    return;
+  }
+
+  const payload = {
+    date: data.date,
+    fundId: data.fundId || project.defaultFundId,
+    category: data.category.trim(),
+    note: data.note.trim(),
+    amount
+  };
+
+  if (editingId) {
+    const index = project.entries.findIndex(entry => entry.id === editingId);
+    if (index >= 0) {
+      project.entries[index] = { ...project.entries[index], ...payload, updatedAt: nowStamp() };
+    }
+  } else {
+    project.entries.push({ id: crypto.randomUUID(), ...payload, createdAt: nowStamp(), updatedAt: nowStamp() });
+  }
+
+  project.updatedAt = nowStamp();
+  saveState();
+  els.dialog.close();
+  render();
+}
+
+function settleOrReopenProject() {
+  const project = selectedProject();
+  if (!project) return;
+
+  if (project.status === "settled") {
+    reopenProject(project);
+  } else {
+    settleProject(project);
+  }
+}
+
+function settleProject(project) {
+  const breakdown = projectBreakdown(project);
+  if (!breakdown.length) return;
+  if (!window.confirm(t("settleProjectConfirm", project.name, breakdown.length))) return;
+  if (!confirmLaterMonthUpdate()) return;
+
+  const month = currentMonth();
+  const settlementDate = project.endDate || todayForCurrentMonth();
+  const createdIds = [];
+
+  breakdown.forEach(item => {
+    const fund = month.funds.find(entry => entry.id === item.fundId);
+    if (!fund) return;
+    const expense = {
+      id: crypto.randomUUID(),
+      date: settlementDate,
+      category: fund.name,
+      note: project.name,
+      amount: item.amount,
+      projectId: project.id,
+      updatedAt: nowStamp()
+    };
+    month.expenses.push(expense);
+    createdIds.push(expense.id);
+    markFundUpdatedByName(fund.name);
+  });
+
+  project.status = "settled";
+  project.settlementExpenseIds = createdIds;
+  project.settledAt = nowStamp();
+  project.updatedAt = nowStamp();
+  cascadeLaterMonthStarts();
+  saveState();
+  render();
+}
+
+function reopenProject(project) {
+  if (!window.confirm(t("reopenProjectConfirm", project.name))) return;
+  if (!confirmLaterMonthUpdate()) return;
+
+  const ids = new Set(project.settlementExpenseIds || []);
+  const month = currentMonth();
+  month.expenses = month.expenses.filter(expense => !ids.has(expense.id));
+  project.status = "active";
+  project.settlementExpenseIds = [];
+  project.updatedAt = nowStamp();
+  cascadeLaterMonthStarts();
+  saveState();
+  render();
+}
+
 function markFundUpdatedByName(name) {
   const fund = currentMonth().funds.find(item => item.name === name);
   if (fund) fund.updatedAt = nowStamp();
@@ -1897,11 +2501,13 @@ function selectCalendarMonth(monthId) {
 function switchMonth(monthId) {
   state.currentMonth = monthId;
   selectedFundId = null;
+  selectedProjectId = null;
   showingAllocationDetail = false;
   activeTab = "home";
   detailReturnTab = "home";
   tabScrollPositions.home = 0;
   tabScrollPositions.records = 0;
+  tabScrollPositions.projects = 0;
   tabScrollPositions.settings = 0;
   saveState();
   render();

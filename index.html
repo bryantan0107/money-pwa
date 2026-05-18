@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=month-popover-1">
+    <link rel="stylesheet" href="styles.css?v=inline-allocation-7">
   </head>
   <body>
     <div class="app-shell">
@@ -132,7 +132,10 @@
                 <label class="record-search" aria-label="Search records">
                   <input id="recordSearchInput" type="search" placeholder="Search date, category, note, amount" autocomplete="off">
                 </label>
-                <select id="recordFilter" aria-label="Filter records"></select>
+                <div class="record-filter-menu">
+                  <button id="recordFilterBtn" class="record-filter-btn" type="button" aria-expanded="false">All Records</button>
+                  <div id="recordFilterPanel" class="record-filter-panel" hidden></div>
+                </div>
                 <div class="record-add-menu">
                   <button id="addRecordBtn" type="button" aria-expanded="false">Add</button>
                   <div id="addRecordMenu" class="record-add-panel" hidden>
@@ -155,6 +158,16 @@
                 <tbody id="recordTable"></tbody>
               </table>
             </div>
+          </section>
+        </section>
+
+        <section id="projectsView" class="tab-view" hidden>
+          <section class="panel projects-panel">
+            <div class="panel-title compact-title">
+              <h2>Projects</h2>
+              <button id="addProjectBtn" type="button">Add</button>
+            </div>
+            <div id="projectsList" class="projects-list"></div>
           </section>
         </section>
 
@@ -236,9 +249,12 @@
             <div class="panel-title">
               <h2>Fund Allocation</h2>
               <div class="inline-actions">
-                <button type="button" id="allocationDetailAddBtn" data-action="open-allocation">Allocate</button>
                 <button type="button" id="allocationDetailMoveBtn" data-action="open-transfer">Move</button>
               </div>
+            </div>
+            <div id="allocationDetailEditActions" class="allocation-edit-actions" hidden>
+              <button type="button" id="allocationDetailCancelBtn" class="secondary-action" hidden>Cancel</button>
+              <button type="button" id="allocationDetailSaveBtn" hidden>Save</button>
             </div>
             <div class="table-wrap">
               <table class="allocation-detail-table">
@@ -319,6 +335,53 @@
           </section>
         </section>
 
+        <section id="projectDetailView" class="detail-view" hidden>
+          <button id="backToProjectsBtn" type="button" class="back-btn">← Projects</button>
+          <section class="panel detail-hero project-hero">
+            <div class="detail-primary">
+              <div>
+                <p class="eyebrow">Project</p>
+                <h2 id="projectDetailName">Project</h2>
+              </div>
+              <div class="detail-balance">
+                <span>Status</span>
+                <strong id="projectDetailStatus">Active</strong>
+              </div>
+            </div>
+            <div class="project-total-row">
+              <div>
+                <span>Total Spent</span>
+                <strong id="projectDetailTotal">0.00</strong>
+              </div>
+              <div>
+                <span>Default Fund</span>
+                <strong id="projectDetailDefaultFund">-</strong>
+              </div>
+            </div>
+            <p id="projectDetailDates" class="project-date-range"></p>
+          </section>
+
+          <section class="panel project-breakdown-panel">
+            <div class="panel-title compact-title">
+              <h2>Fund Breakdown</h2>
+            </div>
+            <div id="projectBreakdownBar" class="allocation-bar project-breakdown-bar"></div>
+            <div id="projectBreakdownList" class="project-breakdown-list"></div>
+          </section>
+
+          <section class="panel project-entries-panel">
+            <div class="panel-title">
+              <h2>Entries</h2>
+              <div class="inline-actions">
+                <button id="editProjectBtn" type="button">Edit</button>
+                <button id="addProjectEntryBtn" type="button">Add Entry</button>
+                <button id="settleProjectBtn" type="button">Settle</button>
+              </div>
+            </div>
+            <div id="projectEntriesList" class="project-entries-list"></div>
+          </section>
+        </section>
+
       </main>
 
       <nav id="bottomNav" class="bottom-nav" aria-label="Primary navigation">
@@ -329,6 +392,10 @@
         <button type="button" data-action="switch-tab" data-tab="records">
           <span aria-hidden="true">≡</span>
           <small>Records</small>
+        </button>
+        <button type="button" data-action="switch-tab" data-tab="projects">
+          <span aria-hidden="true">◇</span>
+          <small>Projects</small>
         </button>
         <button type="button" data-action="switch-tab" data-tab="settings">
           <span aria-hidden="true">⚙</span>
@@ -348,6 +415,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=month-popover-1"></script>
+    <script src="app.js?v=inline-allocation-7"></script>
   </body>
 </html>

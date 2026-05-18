@@ -55,6 +55,13 @@ This file records long-term product direction and user preferences for this proj
 ## Navigation Principles
 
 - Home is the main daily-use screen.
+- Records should combine income and expense records, with search and filtering designed for quick lookup.
+- Records filters should use compact white popovers with clear grouping, not large modals or cramped native dropdowns.
+- Projects are temporary ledgers for trips, events, shopping plans, moving, and other multi-entry situations.
+- Project entries do not directly affect fund balances. Only settlement creates official expense records.
+- A Project has one default fund, but each Project entry can choose its own fund.
+- Settling a Project groups entries by fund and creates one official expense per fund.
+- Settled Projects should be treated as locked unless reopened, which removes settlement-generated expenses.
 - Detail pages should feel like separate mobile app screens.
 - Homepage-only summary elements should not follow into detail pages.
 - `Balance Detail` pages should not show the top income summary strip.
@@ -66,16 +73,19 @@ This file records long-term product direction and user preferences for this proj
 - Detail pages should support a quick left-edge right swipe to return home, with a smooth transition.
 - Returning from a detail page should restore the previous page's scroll position instead of jumping to the top.
 - Bottom tabs should remember their own scroll positions when switching between them.
-- Future bottom navigation may be useful. Tentative tabs:
+- Bottom navigation should always remain visible, including on detail pages and project pages.
+- Current bottom navigation tabs:
   - Home
   - Records
+  - Projects
   - Settings
 - Avoid calling a tab `Account` unless the app actually has login/account/cloud sync.
 - Bottom navigation is now part of the mobile-first direction. Keep it simple and iOS-like:
   - Home for daily overview and available balance
   - Records for income and expense records
-- Settings for backup, restore, currency, and future app settings
-- Detail pages should hide bottom navigation for now, so they feel like focused child screens.
+  - Projects for temporary ledgers before settlement
+  - Settings for backup, restore, currency, and future app settings
+- Detail pages should keep bottom navigation visible for consistent mobile app navigation.
 - Backup and restore belong in Settings; do not keep a duplicate top-right overflow menu for them.
 - App display language should be switchable in Settings. Current supported languages: English and Chinese.
 - The top subtitle under `Money` is not useful and should stay removed.
@@ -122,6 +132,9 @@ This file records long-term product direction and user preferences for this proj
 - Allocation editor should show `Total Income`, `Allocated`, and `Unallocated`, then every fund with editable `Allocated` and `% Income`.
 - Editing `Allocated` should recalculate `% Income`; editing `% Income` should recalculate `Allocated`.
 - `Quick Add` should stay at the top of the allocation editor for one-off adjustments to a single fund.
+- `Income Storage Detail` is the primary allocation editing surface. The `Fund Allocation` table should switch inline into editable `Allocated` and `% Income` inputs instead of opening a separate allocation modal.
+- Homepage `Unallocated / Allocate` should take the user to `Income Storage Detail` in view mode.
+- `Income Storage Detail` should enter inline allocation edit mode only after the user taps an allocated amount or `% Income` value.
 - Do not mix spending progress into the income allocation chart.
 - Spending progress belongs on fund cards and fund detail pages.
 - `Income Storage Detail` should provide more detailed allocation proportions.

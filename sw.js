@@ -1,9 +1,9 @@
-const CACHE_NAME = "money-pwa-v64";
+const CACHE_NAME = "money-pwa-v78";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=month-popover-1",
-  "./app.js?v=month-popover-1",
+  "./styles.css?v=inline-allocation-7",
+  "./app.js?v=inline-allocation-7",
   "./manifest.webmanifest",
   "./icon.svg"
 ];
