@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=default-date-1">
+    <link rel="stylesheet" href="styles.css?v=no-recent-home-1">
   </head>
   <body>
     <div class="app-shell">
@@ -83,14 +83,6 @@
             </div>
             <div id="allocationBar" class="allocation-bar" aria-label="Income allocation chart"></div>
             <div id="allocationLegend" class="allocation-legend"></div>
-          </section>
-
-          <section class="panel recent-panel">
-            <div class="panel-title compact-title">
-              <h2>Recent Expenses</h2>
-              <button id="viewAllExpensesBtn" type="button">View All</button>
-            </div>
-            <div id="recentExpenseList" class="recent-expense-list"></div>
           </section>
 
           <section class="panel funds-panel">
@@ -409,12 +401,13 @@
         <h2 id="dialogTitle" tabindex="-1">Add</h2>
         <div id="formFields" class="form-fields"></div>
         <menu>
+          <button type="button" id="deleteDialogBtn" class="dialog-delete-btn" hidden>Delete Expense</button>
           <button value="cancel" type="button" id="cancelDialogBtn">Cancel</button>
           <button value="default" type="submit">Save</button>
         </menu>
       </form>
     </dialog>
 
-    <script src="app.js?v=default-date-1"></script>
+    <script src="app.js?v=no-recent-home-1"></script>
   </body>
 </html>
