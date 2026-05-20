@@ -6,7 +6,7 @@ const DEFAULT_FUND_SORT = "available-desc";
 const DEFAULT_LANGUAGE = "en";
 const I18N = {
   en: {
-    appSubtitle: (month, funds, expenses) => `${month}, ${funds} fund accounts, ${expenses} expenses`,
+    appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
     backupTitle: "Backup recommended",
     backupDefault: "Save a backup file to iCloud Drive so you can restore it on another phone.",
     backupNow: "Back Up",
@@ -19,15 +19,16 @@ const I18N = {
     allocate: "Allocate",
     incomeStorage: "Income Storage",
     allocationSummary: (allocated, total) => `${allocated} of ${total} allocated`,
+    allocationDetailSummary: (allocated, total, percent) => `${allocated} / ${total} allocated (${percent}% allocated)`,
     allocationChartLabel: percent => `Income allocation chart, ${percent}% allocated`,
     noIncome: "No income yet",
     other: "Other",
     viewAll: "View All",
     availableBalance: "Available Balance",
-    log: "Log",
-    searchFunds: "Search funds",
+    log: "Add",
+    searchFunds: "Search categories",
     sort: "Sort",
-    addFund: "Add fund",
+    addFund: "Add category",
     mostAvailable: "Most available",
     leastAvailable: "Least available",
     recentlyUpdated: "Recently updated",
@@ -37,33 +38,33 @@ const I18N = {
     project: "Project",
     addProject: "Add Project",
     editProject: "Edit Project",
-    addProjectEntry: "Add Project Entry",
+    addProjectEntry: "Add",
     editProjectEntry: "Edit Project Entry",
     projectType: "Type",
-    defaultFund: "Default Fund",
+    defaultFund: "Default Category",
     startDate: "Start Date",
     endDate: "End Date",
     active: "Active",
     settled: "Settled",
     status: "Status",
     totalSpent: "Total Spent",
-    fundBreakdown: "Fund Breakdown",
+    fundBreakdown: "Category Breakdown",
     entries: "Entries",
     settle: "Settle",
     reopen: "Reopen",
     noProjects: "No projects yet.",
     noProjectEntries: "No entries yet.",
     projectSettledNote: "This project has been settled into official expense records.",
-    settleProjectConfirm: (name, count) => `Settle ${name}? This will create ${count} official expense record${count === 1 ? "" : "s"} grouped by fund.`,
+    settleProjectConfirm: (name, count) => `Settle ${name}? This will create ${count} official expense record${count === 1 ? "" : "s"} grouped by category.`,
     reopenProjectConfirm: name => `Reopen ${name}? This will remove the official expense records created by settlement.`,
     travel: "Travel",
     event: "Event",
     shopping: "Shopping",
     moving: "Moving",
-    searchRecords: "Search date, category, note, amount",
+    searchRecords: "Search records",
     allRecords: "All Records",
     type: "Type",
-    expenseFunds: "Expense Funds",
+    expenseFunds: "Expense Categories",
     income: "Income",
     expenses: "Expenses",
     settings: "Settings",
@@ -80,18 +81,18 @@ const I18N = {
     home: "Home",
     balanceDetail: "Balance Detail",
     incomeAllocationDetail: "Income Allocation Detail",
-    fundAllocation: "Fund Allocation",
+    fundAllocation: "Category Allocation",
     available: "Available",
     startingBalance: "Starting Balance",
     monthlyAllocation: "Monthly Allocation",
     spentInFund: "Spent in This Fund",
-    editFund: "Edit Fund",
-    logExpense: "Log Expense",
+    editFund: "Edit Category",
+    logExpense: "Add",
     date: "Date",
     category: "Category",
     note: "Note",
     amount: "Amount",
-    fund: "Fund",
+    fund: "Category",
     percentIncome: "% Income",
     cancel: "Cancel",
     save: "Save",
@@ -101,11 +102,12 @@ const I18N = {
     from: "From",
     to: "To",
     quickAdd: "Quick Add",
-    noFunds: "No funds yet.",
+    filter: "Filter",
+    noFunds: "No categories yet.",
     noMatchingRecords: "No matching records.",
-    noExpensesInFund: "No expenses in this fund yet.",
-    noMatchingFund: "No matching fund found.",
-    noFundAccounts: "No fund accounts yet.",
+    noExpensesInFund: "No expenses in this category yet.",
+    noMatchingFund: "No matching category found.",
+    noFundAccounts: "No categories yet.",
     depleted: "Depleted",
     spent: "Spent",
     pin: "Pin",
@@ -113,15 +115,18 @@ const I18N = {
     editRecord: (category, amount) => `Edit ${category} record ${amount}`,
     addIncome: "Add Income",
     editIncome: "Edit Income",
-    addFundDialog: "Add Fund",
-    editFundDialog: "Edit Fund",
+    addFundDialog: "Add Category",
+    editFundDialog: "Edit Category",
     addExpense: "Add Expense",
     editExpense: "Edit Expense",
-    deleteExpense: "Delete Expense",
+    deleteExpense: "Delete",
     deleteExpenseConfirm: "Delete this expense? Balances will update immediately.",
     deleteSettledProjectExpenseConfirm: "This expense was created by a project settlement. Delete it anyway? It will be removed from that settlement link.",
     allocateIncome: "Allocate Income",
-    moveFunds: "Move Between Funds",
+    deleteProject: "Delete",
+    deleteProjectConfirm: name => `Delete ${name}? This removes the project and its entries.`,
+    deleteSettledProjectConfirm: name => `Delete ${name}? This also removes the expense records created when this project was settled.`,
+    moveFunds: "Move Between Categories",
     greyMonths: "Grey months have not been created yet. The small line marks the real current month.",
     openMonthCalendar: "Open month calendar",
     previousYear: "Previous year",
@@ -137,11 +142,11 @@ const I18N = {
     validAmount: "Please enter a valid amount.",
     validQuickAdd: "Enter a valid quick add amount.",
     validAllocations: "Please enter valid allocation amounts.",
-    validTransfer: "Choose two different funds and enter a valid amount.",
+    validTransfer: "Choose two different categories and enter a valid amount.",
     importFailed: "Import failed. Please choose a JSON file exported by this app."
   },
   zh: {
-    appSubtitle: (month, funds, expenses) => `${month}，${funds} 个基金账户，${expenses} 条消费`,
+    appSubtitle: (month, funds, expenses) => `${month}，${funds} 个分类，${expenses} 条消费`,
     backupTitle: "建议备份一次",
     backupDefault: "导出备份文件并保存到 iCloud Drive，之后可在另一台手机恢复。",
     backupNow: "备份",
@@ -154,15 +159,16 @@ const I18N = {
     allocate: "分配",
     incomeStorage: "收入分配",
     allocationSummary: (allocated, total) => `${allocated} / ${total} 已分配`,
+    allocationDetailSummary: (allocated, total, percent) => `${allocated} / ${total} 已分配（已分配 ${percent}%）`,
     allocationChartLabel: percent => `收入分配图，已分配 ${percent}%`,
     noIncome: "还没有收入",
     other: "其他",
     viewAll: "查看全部",
     availableBalance: "可用余额",
-    log: "记账",
-    searchFunds: "搜索基金",
+    log: "添加",
+    searchFunds: "搜索分类",
     sort: "排序",
-    addFund: "添加基金",
+    addFund: "添加分类",
     mostAvailable: "可用最多",
     leastAvailable: "可用最少",
     recentlyUpdated: "最近更新",
@@ -172,33 +178,33 @@ const I18N = {
     project: "项目",
     addProject: "添加项目",
     editProject: "编辑项目",
-    addProjectEntry: "添加项目明细",
+    addProjectEntry: "添加",
     editProjectEntry: "编辑项目明细",
     projectType: "类型",
-    defaultFund: "默认基金",
+    defaultFund: "默认分类",
     startDate: "开始日期",
     endDate: "结束日期",
     active: "进行中",
     settled: "已结算",
     status: "状态",
     totalSpent: "总花费",
-    fundBreakdown: "基金分布",
+    fundBreakdown: "分类分布",
     entries: "明细",
     settle: "结算",
     reopen: "重新打开",
     noProjects: "还没有项目。",
     noProjectEntries: "还没有项目明细。",
     projectSettledNote: "这个项目已经结算为正式支出记录。",
-    settleProjectConfirm: (name, count) => `结算 ${name}？会按基金生成 ${count} 条正式支出记录。`,
+    settleProjectConfirm: (name, count) => `结算 ${name}？会按分类生成 ${count} 条正式支出记录。`,
     reopenProjectConfirm: name => `重新打开 ${name}？这会删除结算时生成的正式支出记录。`,
     travel: "旅行",
     event: "活动",
     shopping: "购物",
     moving: "搬家",
-    searchRecords: "搜索日期、分类、备注、金额",
+    searchRecords: "搜索记录",
     allRecords: "全部记录",
     type: "类型",
-    expenseFunds: "支出基金",
+    expenseFunds: "支出分类",
     income: "收入",
     expenses: "支出",
     settings: "设置",
@@ -215,18 +221,18 @@ const I18N = {
     home: "首页",
     balanceDetail: "余额明细",
     incomeAllocationDetail: "收入分配明细",
-    fundAllocation: "基金分配",
+    fundAllocation: "分类分配",
     available: "可用",
     startingBalance: "起始余额",
     monthlyAllocation: "本月分配",
-    spentInFund: "本基金已花",
-    editFund: "编辑基金",
-    logExpense: "记一笔",
+    spentInFund: "本分类已花",
+    editFund: "编辑分类",
+    logExpense: "添加",
     date: "日期",
     category: "分类",
     note: "备注",
     amount: "金额",
-    fund: "基金",
+    fund: "分类",
     percentIncome: "% 收入",
     cancel: "取消",
     save: "保存",
@@ -236,11 +242,12 @@ const I18N = {
     from: "从",
     to: "到",
     quickAdd: "快速添加",
-    noFunds: "还没有基金。",
+    filter: "筛选",
+    noFunds: "还没有分类。",
     noMatchingRecords: "没有匹配记录。",
-    noExpensesInFund: "这个基金还没有支出。",
-    noMatchingFund: "没有匹配基金。",
-    noFundAccounts: "还没有基金账户。",
+    noExpensesInFund: "这个分类还没有支出。",
+    noMatchingFund: "没有匹配分类。",
+    noFundAccounts: "还没有分类。",
     depleted: "已用完",
     spent: "已花",
     pin: "置顶",
@@ -248,15 +255,18 @@ const I18N = {
     editRecord: (category, amount) => `编辑 ${category} 记录 ${amount}`,
     addIncome: "添加收入",
     editIncome: "编辑收入",
-    addFundDialog: "添加基金",
-    editFundDialog: "编辑基金",
+    addFundDialog: "添加分类",
+    editFundDialog: "编辑分类",
     addExpense: "添加支出",
     editExpense: "编辑支出",
-    deleteExpense: "删除支出",
+    deleteExpense: "删除",
     deleteExpenseConfirm: "删除这笔支出？余额会立即更新。",
     deleteSettledProjectExpenseConfirm: "这笔支出来自项目结算。仍然删除吗？它会从该项目结算记录中移除。",
     allocateIncome: "分配收入",
-    moveFunds: "基金间移动",
+    deleteProject: "删除",
+    deleteProjectConfirm: name => `删除 ${name}？这会删除项目和里面的明细。`,
+    deleteSettledProjectConfirm: name => `删除 ${name}？这也会删除项目结算时生成的正式支出记录。`,
+    moveFunds: "分类间移动",
     greyMonths: "灰色月份还没有创建。细线标记现实中的当前月份。",
     openMonthCalendar: "打开月份日历",
     previousYear: "上一年",
@@ -272,7 +282,7 @@ const I18N = {
     validAmount: "请输入有效金额。",
     validQuickAdd: "请输入有效的快速添加金额。",
     validAllocations: "请输入有效的分配金额。",
-    validTransfer: "请选择两个不同的基金并输入有效金额。",
+    validTransfer: "请选择两个不同的分类并输入有效金额。",
     importFailed: "导入失败。请选择这个 app 导出的 JSON 备份文件。"
   }
 };
@@ -400,17 +410,11 @@ let monthCalendarYear = Number(state.currentMonth.slice(0, 4));
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
-  totalIncome: document.querySelector("#totalIncome"),
   privacyToggleBtn: document.querySelector("#privacyToggleBtn"),
-  allocatedAmount: document.querySelector("#allocatedAmount"),
-  unallocatedAmount: document.querySelector("#unallocatedAmount"),
-  allocateIncomeBtn: document.querySelector("#allocateIncomeBtn"),
-  spentAmount: document.querySelector("#spentAmount"),
   backupReminder: document.querySelector("#backupReminder"),
   backupReminderText: document.querySelector("#backupReminderText"),
   backupNowBtn: document.querySelector("#backupNowBtn"),
   dismissBackupBtn: document.querySelector("#dismissBackupBtn"),
-  moneyDashboard: document.querySelector(".money-dashboard"),
   dashboardView: document.querySelector("#dashboardView"),
   recordsView: document.querySelector("#recordsView"),
   projectsView: document.querySelector("#projectsView"),
@@ -421,6 +425,10 @@ const els = {
   allocationSummaryText: document.querySelector("#allocationSummaryText"),
   allocationBar: document.querySelector("#allocationBar"),
   allocationLegend: document.querySelector("#allocationLegend"),
+  storageTotalIncome: document.querySelector("#storageTotalIncome"),
+  storageAllocatedAmount: document.querySelector("#storageAllocatedAmount"),
+  storageUnallocatedAmount: document.querySelector("#storageUnallocatedAmount"),
+  allocationDetailAddIncomeBtn: document.querySelector("#allocationDetailAddIncomeBtn"),
   allocationDetailPercent: document.querySelector("#allocationDetailPercent"),
   allocationDetailBar: document.querySelector("#allocationDetailBar"),
   allocationDetailIncome: document.querySelector("#allocationDetailIncome"),
@@ -437,10 +445,12 @@ const els = {
   detailAllocation: document.querySelector("#detailAllocation"),
   detailSpent: document.querySelector("#detailSpent"),
   detailExpenseTable: document.querySelector("#detailExpenseTable"),
+  detailMoveBtn: document.querySelector("#detailMoveBtn"),
   fundSearchInput: document.querySelector("#fundSearchInput"),
   fundSearchResults: document.querySelector("#fundSearchResults"),
   fundSortSelect: document.querySelector("#fundSortSelect"),
   addFundBtn: document.querySelector("#addFundBtn"),
+  quickMoveBtn: document.querySelector("#quickMoveBtn"),
   fundList: document.querySelector("#fundList"),
   recordTable: document.querySelector("#recordTable"),
   recordSearchInput: document.querySelector("#recordSearchInput"),
@@ -458,11 +468,12 @@ const els = {
   projectDetailTotal: document.querySelector("#projectDetailTotal"),
   projectDetailDefaultFund: document.querySelector("#projectDetailDefaultFund"),
   projectDetailDates: document.querySelector("#projectDetailDates"),
+  projectDetailMetaBtn: document.querySelector("#projectDetailMetaBtn"),
   projectBreakdownBar: document.querySelector("#projectBreakdownBar"),
   projectBreakdownList: document.querySelector("#projectBreakdownList"),
   projectEntriesList: document.querySelector("#projectEntriesList"),
   addProjectEntryBtn: document.querySelector("#addProjectEntryBtn"),
-  editProjectBtn: document.querySelector("#editProjectBtn"),
+  deleteProjectBtn: document.querySelector("#deleteProjectBtn"),
   settleProjectBtn: document.querySelector("#settleProjectBtn"),
   dialog: document.querySelector("#entryDialog"),
   monthDialog: document.querySelector("#monthDialog"),
@@ -484,11 +495,13 @@ els.privacyToggleBtn.addEventListener("click", () => {
   saveState();
   render();
 });
-document.querySelector("#quickIncomeBtn").addEventListener("click", () => openDialog("income"));
 document.querySelector("#addFundBtn").addEventListener("click", () => openDialog("fund"));
 document.querySelector("#quickExpenseBtn").addEventListener("click", () => openDialog("expense"));
-els.allocateIncomeBtn.addEventListener("click", () => showAllocationDetail(false));
-document.querySelector("#moveFundsBtn").addEventListener("click", () => openDialog("transfer"));
+els.quickMoveBtn.addEventListener("click", () => openDialog("transfer"));
+els.allocationDetailAddIncomeBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  openDialog("income");
+});
 els.addRecordBtn.addEventListener("click", toggleAddRecordMenu);
 els.addRecordIncomeBtn.addEventListener("click", () => {
   closeAddRecordMenu();
@@ -506,10 +519,6 @@ els.allocationDetailSaveBtn.addEventListener("click", saveInlineAllocationDetail
 els.allocationDetailCancelBtn.addEventListener("click", () => {
   allocationDetailEditing = false;
   renderAllocationDetail();
-});
-document.querySelector("#allocationDetailMoveBtn").addEventListener("click", event => {
-  event.stopPropagation();
-  openDialog("transfer");
 });
 els.allocationDetailTable.addEventListener("click", event => {
   if (allocationDetailEditing) return;
@@ -530,7 +539,8 @@ document.querySelector("#detailAddExpenseBtn").addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("expense", null, { category: fund.name });
 });
-document.querySelector("#detailEditFundBtn").addEventListener("click", () => {
+els.detailMoveBtn.addEventListener("click", () => openDialog("transfer"));
+els.detailFundName.addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("fund", fund.id);
 });
@@ -538,10 +548,15 @@ els.addProjectEntryBtn.addEventListener("click", () => {
   const project = selectedProject();
   if (project && project.status !== "settled") openDialog("projectEntry", null, { fundId: project.defaultFundId });
 });
-els.editProjectBtn.addEventListener("click", () => {
+els.projectDetailName.addEventListener("click", () => {
   const project = selectedProject();
   if (project) openDialog("project", project.id);
 });
+els.projectDetailMetaBtn.addEventListener("click", () => {
+  const project = selectedProject();
+  if (project) openDialog("project", project.id);
+});
+els.deleteProjectBtn.addEventListener("click", deleteSelectedProject);
 els.settleProjectBtn.addEventListener("click", settleOrReopenProject);
 els.languageSelect.addEventListener("change", event => {
   state.language = event.target.value;
@@ -553,7 +568,7 @@ els.settingsImportInput.addEventListener("change", importData);
 els.backupNowBtn.addEventListener("click", exportData);
 els.dismissBackupBtn.addEventListener("click", dismissBackupReminder);
 document.querySelector("#cancelDialogBtn").addEventListener("click", closeEntryDialog);
-els.deleteDialogBtn.addEventListener("click", deleteCurrentExpense);
+els.deleteDialogBtn.addEventListener("click", deleteCurrentDialogItem);
 document.querySelector("#prevYearBtn").addEventListener("click", () => {
   monthCalendarYear -= 1;
   renderMonthCalendar();
@@ -602,6 +617,12 @@ els.allocationDetailView.addEventListener("touchend", finishDetailSwipe, { passi
 els.projectDetailView.addEventListener("touchstart", startDetailSwipe, { passive: true });
 els.projectDetailView.addEventListener("touchmove", moveDetailSwipe, { passive: false });
 els.projectDetailView.addEventListener("touchend", finishDetailSwipe, { passive: true });
+window.addEventListener("resize", () => {
+  if (!els.recordFilterPanel.hidden) positionRecordFilterPanel();
+});
+window.addEventListener("scroll", () => {
+  if (!els.recordFilterPanel.hidden) positionRecordFilterPanel();
+}, { passive: true });
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -872,14 +893,6 @@ function render() {
   if (selectedFundId && !selectedFund()) selectedFundId = null;
   if (selectedProjectId && !selectedProject()) selectedProjectId = null;
 
-  const totalIncome = sum(month.incomes);
-  const allocated = sum(month.funds, "allocation");
-
-  els.totalIncome.textContent = money(totalIncome);
-  els.allocatedAmount.textContent = money(allocated);
-  els.unallocatedAmount.textContent = money(unallocatedFor(month));
-  els.allocateIncomeBtn.disabled = month.funds.length === 0;
-
   renderIncomeStorage();
   renderAllocationDetail();
   renderFunds();
@@ -892,7 +905,6 @@ function render() {
   renderDetailSortLabels();
   renderBackupReminder();
   const inDetail = Boolean(selectedFundId) || showingAllocationDetail || Boolean(selectedProjectId);
-  els.moneyDashboard.hidden = inDetail || activeTab !== "home";
   els.dashboardView.hidden = inDetail || activeTab !== "home";
   els.recordsView.hidden = inDetail || activeTab !== "records";
   els.projectsView.hidden = inDetail || activeTab !== "projects";
@@ -920,16 +932,15 @@ function renderStaticLanguage() {
   els.backupNowBtn.textContent = t("backupNow");
   els.dismissBackupBtn.textContent = t("later");
   document.querySelector("#backupReminder strong").textContent = t("backupTitle");
-  document.querySelector(".money-dashboard .metric.income span").textContent = t("totalIncome");
-  document.querySelector(".money-dashboard .metric.allocated span").textContent = t("allocated");
-  document.querySelector(".money-dashboard .metric.left span").textContent = t("unallocated");
-  document.querySelector("#quickIncomeBtn").textContent = t("add");
-  document.querySelector("#moveFundsBtn").textContent = t("move");
-  els.allocateIncomeBtn.textContent = t("allocate");
   document.querySelector("#incomeStorageCard h2").textContent = t("incomeStorage");
+  document.querySelector("#incomeStorageCard .metric.income span").textContent = t("totalIncome");
+  document.querySelector("#incomeStorageCard .metric.allocated span").textContent = t("allocated");
+  document.querySelector("#incomeStorageCard .metric.left span").textContent = t("unallocated");
   document.querySelector(".fund-title-row h2").textContent = t("availableBalance");
+  document.querySelector("#quickMoveBtn").textContent = t("move");
   document.querySelector("#quickExpenseBtn").textContent = t("log");
   els.fundSearchInput.placeholder = t("searchFunds");
+  document.querySelector(".search-field").setAttribute("aria-label", t("searchFunds"));
   document.querySelector(".sort-label").textContent = t("sort");
   document.querySelector(".sort-display").textContent = t("sort");
   document.querySelector("#fundSortSelect").setAttribute("aria-label", t("sort"));
@@ -943,10 +954,15 @@ function renderStaticLanguage() {
   els.addFundBtn.setAttribute("aria-label", t("addFund"));
   document.querySelector("#recordsView h2").textContent = t("records");
   els.recordSearchInput.placeholder = t("searchRecords");
-  els.recordFilterBtn.setAttribute("aria-label", t("records"));
+  els.recordFilterBtn.textContent = t("filter");
+  els.recordFilterBtn.setAttribute("aria-label", t("filter"));
   els.addRecordBtn.textContent = t("add");
   els.addRecordIncomeBtn.textContent = t("income");
   els.addRecordExpenseBtn.textContent = t("expenses");
+  document.querySelector(".records-table th:nth-child(1)").textContent = t("date");
+  document.querySelector(".records-table th:nth-child(2)").textContent = t("category");
+  document.querySelector(".records-table th:nth-child(3)").textContent = t("note");
+  document.querySelector(".records-table th:nth-child(4)").textContent = t("amount");
   document.querySelector("#projectsView h2").textContent = t("projects");
   els.addProjectBtn.textContent = t("add");
   document.querySelector("#settingsView h2").textContent = t("settings");
@@ -969,24 +985,21 @@ function renderStaticLanguage() {
   document.querySelector("#backToProjectsBtn").textContent = `← ${t("projects")}`;
   document.querySelector("#allocationDetailView .eyebrow").textContent = t("incomeAllocationDetail");
   document.querySelector("#allocationDetailView h2").textContent = t("incomeStorage");
-  document.querySelector("#allocationDetailView .detail-balance span").textContent = t("allocated");
+  document.querySelector("#allocationDetailAddIncomeBtn").textContent = t("add");
   document.querySelector("#allocationDetailView .detail-stats .metric.income span").textContent = t("totalIncome");
   document.querySelector("#allocationDetailView .detail-stats .metric.allocated span").textContent = t("allocated");
   document.querySelector("#allocationDetailView .detail-stats .metric.left span").textContent = t("unallocated");
   document.querySelector("#allocationDetailView .expense-panel h2").textContent = t("fundAllocation");
-  document.querySelector("#allocationDetailMoveBtn").textContent = t("move");
   els.allocationDetailSaveBtn.textContent = t("save");
   els.allocationDetailCancelBtn.textContent = t("cancel");
-  document.querySelector(".allocation-detail-table th:nth-child(1)").textContent = t("fund");
-  document.querySelector(".allocation-detail-table th:nth-child(2)").textContent = t("allocated");
-  document.querySelector(".allocation-detail-table th:nth-child(3)").textContent = t("percentIncome");
+  document.querySelector(".allocation-detail-table th:nth-child(1)").textContent = t("fundAllocation");
   document.querySelector("#detailView .eyebrow").textContent = t("balanceDetail");
   document.querySelector("#detailView .detail-balance span").textContent = t("available");
   document.querySelector("#detailView .detail-stats .metric:nth-child(1) span").textContent = t("startingBalance");
   document.querySelector("#detailView .detail-stats .metric:nth-child(2) span").textContent = t("monthlyAllocation");
   document.querySelector("#detailView .detail-stats .metric:nth-child(3) span").textContent = t("spentInFund");
   document.querySelector("#detailView .expense-panel h2").textContent = t("expenses");
-  document.querySelector("#detailEditFundBtn").textContent = t("editFund");
+  document.querySelector("#detailMoveBtn").textContent = t("move");
   document.querySelector("#detailAddExpenseBtn").textContent = t("logExpense");
   document.querySelector("[data-field='date'] span:first-child").textContent = t("date");
   document.querySelector(".detail-expense-table th:nth-child(2)").textContent = t("note");
@@ -996,21 +1009,24 @@ function renderStaticLanguage() {
   els.deleteDialogBtn.textContent = t("deleteExpense");
   document.querySelector("#prevYearBtn").setAttribute("aria-label", t("previousYear"));
   document.querySelector("#nextYearBtn").setAttribute("aria-label", t("nextYear"));
-  document.querySelector("#projectDetailView .eyebrow").textContent = t("project");
-  document.querySelector("#projectDetailView .detail-balance span").textContent = t("status");
-  document.querySelector(".project-total-row div:nth-child(1) span").textContent = t("totalSpent");
-  document.querySelector(".project-total-row div:nth-child(2) span").textContent = t("defaultFund");
   document.querySelector(".project-breakdown-panel h2").textContent = t("fundBreakdown");
   document.querySelector(".project-entries-panel h2").textContent = t("entries");
-  els.editProjectBtn.textContent = t("edit");
-  els.addProjectEntryBtn.textContent = t("addProjectEntry");
+  els.deleteProjectBtn.textContent = t("deleteProject");
+  els.addProjectEntryBtn.textContent = t("add");
+  document.querySelector(".project-entries-table th:nth-child(1)").textContent = t("date");
+  document.querySelector(".project-entries-table th:nth-child(2)").textContent = t("category");
+  document.querySelector(".project-entries-table th:nth-child(3)").textContent = t("note");
+  document.querySelector(".project-entries-table th:nth-child(4)").textContent = t("amount");
 }
 
 function renderIncomeStorage() {
-  const { totalIncome, allocated, segments } = allocationSegments();
+  const { totalIncome, allocated, unallocated, segments } = allocationSegments();
   const percent = totalIncome > 0 ? Math.min(100, Math.max(0, (allocated / totalIncome) * 100)) : 0;
 
   els.allocationSummaryText.textContent = t("allocationSummary", money(allocated), money(totalIncome));
+  els.storageTotalIncome.textContent = money(totalIncome);
+  els.storageAllocatedAmount.textContent = money(allocated);
+  els.storageUnallocatedAmount.textContent = money(unallocated);
   els.allocationBar.innerHTML = renderAllocationBarSegments(segments, totalIncome);
   els.allocationLegend.innerHTML = segments.length
     ? segments.slice(0, 6).map(segment => `
@@ -1030,7 +1046,7 @@ function renderAllocationDetail() {
   const rows = [...month.funds]
     .sort((a, b) => Number(b.allocation || 0) - Number(a.allocation || 0) || a.name.localeCompare(b.name));
 
-  els.allocationDetailPercent.textContent = `${Math.round(percent)}%`;
+  els.allocationDetailPercent.textContent = t("allocationDetailSummary", money(allocated), money(totalIncome), Math.round(percent));
   els.allocationDetailIncome.textContent = money(totalIncome);
   els.allocationDetailAllocated.textContent = money(allocated);
   els.allocationDetailUnallocated.textContent = money(unallocated);
@@ -1043,28 +1059,45 @@ function renderAllocationDetail() {
     ? rows.map(fund => {
       const allocation = Number(fund.allocation || 0);
       const incomeShare = totalIncome > 0 ? (allocation / totalIncome) * 100 : 0;
+      const afterBalance = balanceFor({ ...fund, allocation });
       if (allocationDetailEditing) {
         return `
-          <tr>
-            <td data-label="${t("fund")}">${escapeHtml(fund.name)}</td>
-            <td class="number" data-label="${t("allocated")}">
-              <input name="detail-allocation:${fund.id}" data-detail-allocation-input data-fund-id="${fund.id}" value="${escapeAttr(allocation.toFixed(2))}" type="text" inputmode="decimal" autocomplete="off">
-            </td>
-            <td class="number" data-label="${t("percentIncome")}">
-              <input name="detail-percent:${fund.id}" data-detail-percent-input data-fund-id="${fund.id}" value="${escapeAttr(incomeShare.toFixed(1))}" type="text" inputmode="decimal" autocomplete="off">
+          <tr class="allocation-mobile-row" data-fund-id="${fund.id}">
+            <td>
+              <div class="allocation-row-main">
+                <strong>${escapeHtml(fund.name)}</strong>
+                <div class="allocation-row-inputs">
+                  <input name="detail-allocation:${fund.id}" data-detail-allocation-input data-fund-id="${fund.id}" value="${escapeAttr(allocation.toFixed(2))}" type="text" inputmode="decimal" autocomplete="off" aria-label="${escapeAttr(t("allocated"))} ${escapeAttr(fund.name)}">
+                  <input name="detail-percent:${fund.id}" data-detail-percent-input data-fund-id="${fund.id}" value="${escapeAttr(incomeShare.toFixed(1))}" type="text" inputmode="decimal" autocomplete="off" aria-label="${escapeAttr(t("percentIncome"))} ${escapeAttr(fund.name)}">
+                </div>
+              </div>
+              <div class="allocation-row-meta">
+                <span>${t("startingBalance")} ${money(fund.start)}</span>
+                <span data-after-balance>${t("available")} ${money(afterBalance)}</span>
+              </div>
             </td>
           </tr>
         `;
       }
       return `
-        <tr>
-          <td data-label="${t("fund")}">${escapeHtml(fund.name)}</td>
-          <td class="number editable-number" data-action="edit-inline-allocation" data-label="${t("allocated")}">${money(allocation)}</td>
-          <td class="number editable-number" data-action="edit-inline-allocation" data-label="${t("percentIncome")}">${incomeShare.toFixed(1)}%</td>
+        <tr class="allocation-mobile-row clickable-row" data-action="edit-inline-allocation" tabindex="0" aria-label="${escapeAttr(`${fund.name} ${money(allocation)} ${incomeShare.toFixed(1)}%`)}">
+          <td>
+            <div class="allocation-row-main">
+              <strong>${escapeHtml(fund.name)}</strong>
+              <button class="editable-number allocation-inline-value" type="button" data-action="edit-inline-allocation">
+                <span>${money(allocation)}</span>
+                <small>${incomeShare.toFixed(1)}%</small>
+              </button>
+            </div>
+            <div class="allocation-row-meta">
+              <span>${t("startingBalance")} ${money(fund.start)}</span>
+              <span>${t("available")} ${money(afterBalance)}</span>
+            </div>
+          </td>
         </tr>
       `;
     }).join("")
-    : `<tr><td colspan="3" class="empty">${t("noFunds")}</td></tr>`;
+    : `<tr><td class="empty">${t("noFunds")}</td></tr>`;
 }
 
 function renderAllocationBarSegments(segments, total) {
@@ -1104,13 +1137,43 @@ function updateInlineAllocationDetail(event) {
 
 function refreshInlineAllocationSummary() {
   const totalIncome = sum(currentMonth().incomes);
-  const allocated = [...els.allocationDetailTable.querySelectorAll("[data-detail-allocation-input]")]
-    .reduce((total, input) => total + (parseMoneyInput(input.value) || 0), 0);
+  const previewFunds = currentMonth().funds.map(fund => {
+    const input = els.allocationDetailTable.querySelector(`[data-detail-allocation-input][data-fund-id="${fund.id}"]`);
+    const allocation = parseMoneyInput(input?.value) ?? Number(fund.allocation || 0);
+    return { ...fund, allocation };
+  });
+  const allocated = sum(previewFunds, "allocation");
   const unallocated = totalIncome - allocated;
   const percent = totalIncome > 0 ? Math.min(100, Math.max(0, (allocated / totalIncome) * 100)) : 0;
-  els.allocationDetailPercent.textContent = `${Math.round(percent)}%`;
+  els.allocationDetailPercent.textContent = t("allocationDetailSummary", money(allocated), money(totalIncome), Math.round(percent));
   els.allocationDetailAllocated.textContent = money(allocated);
   els.allocationDetailUnallocated.textContent = money(unallocated);
+  els.allocationDetailBar.innerHTML = renderAllocationBarSegments(allocationPreviewSegments(previewFunds, totalIncome, 8), totalIncome);
+  previewFunds.forEach(fund => {
+    const row = els.allocationDetailTable.querySelector(`tr[data-fund-id="${fund.id}"]`);
+    const after = row?.querySelector("[data-after-balance]");
+    if (after) after.textContent = `${t("available")} ${money(balanceFor(fund))}`;
+  });
+}
+
+function allocationPreviewSegments(funds, totalIncome, limit = 5) {
+  const colors = ["#ff3b30", "#ff8a1f", "#f5c400", "#34a853", "#0071e3", "#8e8e93"];
+  const allocatedFunds = funds
+    .filter(fund => Number(fund.allocation || 0) > 0)
+    .sort((a, b) => Number(b.allocation || 0) - Number(a.allocation || 0));
+  const visibleFunds = allocatedFunds.slice(0, limit);
+  const otherFunds = allocatedFunds.slice(limit);
+  const segments = visibleFunds.map((fund, index) => ({
+    label: fund.name,
+    amount: Number(fund.allocation || 0),
+    color: colors[index % colors.length]
+  }));
+  const otherAmount = sum(otherFunds, "allocation");
+  const unallocated = Math.max(0, totalIncome - sum(funds, "allocation"));
+
+  if (otherAmount > 0) segments.push({ label: t("other"), amount: otherAmount, color: "#a1a1a6" });
+  if (unallocated > 0) segments.push({ label: t("unallocated"), amount: unallocated, color: "#d1d1d6", muted: true });
+  return segments;
 }
 
 function saveInlineAllocationDetail() {
@@ -1257,16 +1320,13 @@ function renderDetail() {
   els.detailSpent.textContent = money(spent);
   els.detailExpenseTable.innerHTML = expenses.length
     ? expenses.map(expense => `
-      <tr>
+      <tr class="clickable-row" data-action="edit-expense" data-id="${expense.id}" tabindex="0" aria-label="${escapeAttr(t("editRecord", expense.category, money(expense.amount)))}">
         <td>${escapeHtml(expense.date)}</td>
         <td>${escapeHtml(expense.note || "-")}</td>
         <td class="number">${money(expense.amount)}</td>
-        <td class="action-cell">
-          <button type="button" data-action="edit-expense" data-id="${expense.id}">${t("edit")}</button>
-        </td>
       </tr>
     `).join("")
-    : `<tr><td colspan="4" class="empty">${t("noExpensesInFund")}</td></tr>`;
+    : `<tr><td colspan="3" class="empty">${t("noExpensesInFund")}</td></tr>`;
 }
 
 function compareDetailExpenses(a, b) {
@@ -1305,7 +1365,8 @@ function renderRecordFilter() {
   const validValues = ["All", "Income", "Expenses", ...currentMonth().funds.map(fund => `category:${fund.name}`)];
   if (!validValues.includes(recordFilterValue)) recordFilterValue = "All";
 
-  els.recordFilterBtn.textContent = recordFilterLabel(recordFilterValue);
+  els.recordFilterBtn.textContent = t("filter");
+  els.recordFilterBtn.title = recordFilterLabel(recordFilterValue);
   els.recordFilterPanel.innerHTML = [
     renderRecordFilterGroup("", [
       { value: "All", label: t("allRecords") }
@@ -1365,13 +1426,31 @@ function recordFilterLabel(value) {
 
 function toggleRecordFilterMenu() {
   const isHidden = els.recordFilterPanel.hidden;
-  els.recordFilterPanel.hidden = !isHidden;
-  els.recordFilterBtn.setAttribute("aria-expanded", String(isHidden));
+  if (isHidden) {
+    positionRecordFilterPanel();
+    els.recordFilterPanel.hidden = false;
+    els.recordFilterBtn.setAttribute("aria-expanded", "true");
+    return;
+  }
+  closeRecordFilterMenu();
 }
 
 function closeRecordFilterMenu() {
   els.recordFilterPanel.hidden = true;
   els.recordFilterBtn.setAttribute("aria-expanded", "false");
+}
+
+function positionRecordFilterPanel() {
+  const rect = els.recordFilterBtn.getBoundingClientRect();
+  const margin = 14;
+  const width = Math.min(280, window.innerWidth - margin * 2);
+  const left = Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin);
+  const bottomReserve = 140;
+  const maxHeight = Math.max(180, window.innerHeight - rect.bottom - bottomReserve);
+  els.recordFilterPanel.style.width = `${width}px`;
+  els.recordFilterPanel.style.left = `${left}px`;
+  els.recordFilterPanel.style.top = `${rect.bottom + 8}px`;
+  els.recordFilterPanel.style.maxHeight = `${maxHeight}px`;
 }
 
 function unifiedRecords() {
@@ -1464,7 +1543,6 @@ function renderProjects() {
         <article class="project-card ${project.status === "settled" ? "is-settled" : ""}" data-action="view-project" data-id="${project.id}">
           <div class="project-card-head">
             <div>
-              <span class="project-type">${escapeHtml(projectTypeLabel(project.type))}</span>
               <h3>${escapeHtml(project.name)}</h3>
             </div>
             <strong>${money(total)}</strong>
@@ -1491,10 +1569,14 @@ function renderProjectDetail() {
   const entries = [...project.entries].sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
 
   els.projectDetailName.textContent = project.name;
-  els.projectDetailStatus.textContent = isSettled ? t("settled") : t("active");
+  els.projectDetailStatus.classList.toggle("is-active", !isSettled);
+  els.projectDetailStatus.classList.toggle("is-settled", isSettled);
+  els.projectDetailStatus.innerHTML = `<i></i><span>${isSettled ? t("settled") : t("active")}</span>`;
   els.projectDetailTotal.textContent = money(total);
   els.projectDetailDefaultFund.textContent = fundNameById(project.defaultFundId) || "-";
   els.projectDetailDates.textContent = projectDateRange(project);
+  els.projectDetailName.title = t("editProject");
+  els.projectDetailMetaBtn.title = t("editProject");
   els.projectBreakdownBar.innerHTML = renderAllocationBarSegments(breakdown, total);
   els.projectBreakdownList.innerHTML = breakdown.length
     ? breakdown.map(item => `
@@ -1507,22 +1589,22 @@ function renderProjectDetail() {
   els.addProjectEntryBtn.hidden = isSettled;
   els.settleProjectBtn.textContent = isSettled ? t("reopen") : t("settle");
   els.settleProjectBtn.disabled = !isSettled && total <= 0;
+  els.settleProjectBtn.classList.toggle("primary-action", !isSettled);
+  els.settleProjectBtn.classList.toggle("secondary-action", isSettled);
 
   els.projectEntriesList.innerHTML = entries.length
-    ? entries.map(entry => `
-      <article class="project-entry clickable-row" data-action="edit-project-entry" data-id="${entry.id}" data-kind="projectEntry" tabindex="0">
-        <div>
-          <span>${escapeHtml(formatShortDate(entry.date))}</span>
-          <strong>${escapeHtml(entry.category || t("expenses"))}</strong>
-          <small>${escapeHtml(entry.note || "")}</small>
-        </div>
-        <div>
-          <strong>${money(entry.amount)}</strong>
-          <small>${escapeHtml(fundNameById(entry.fundId) || "-")}</small>
-        </div>
-      </article>
-    `).join("")
-    : `<p class="empty">${isSettled ? t("projectSettledNote") : t("noProjectEntries")}</p>`;
+    ? entries.map(entry => {
+      const categoryName = fundNameById(entry.fundId) || entry.category || t("other");
+      return `
+      <tr class="clickable-row" data-action="edit-project-entry" data-id="${entry.id}" data-kind="projectEntry" tabindex="0" aria-label="${escapeAttr(t("editRecord", categoryName, money(entry.amount)))}">
+        <td>${escapeHtml(formatShortDate(entry.date))}</td>
+        <td>${escapeHtml(categoryName)}</td>
+        <td>${escapeHtml(entry.note || "-")}</td>
+        <td class="number">${money(entry.amount)}</td>
+      </tr>
+    `;
+    }).join("")
+    : `<tr><td colspan="4" class="empty">${isSettled ? t("projectSettledNote") : t("noProjectEntries")}</td></tr>`;
 }
 
 function projectTotal(project) {
@@ -1632,9 +1714,14 @@ document.body.addEventListener("click", event => {
 });
 
 document.body.addEventListener("keydown", event => {
-  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-project-entry']");
+  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-project-entry'], .clickable-row[data-action='edit-inline-allocation']");
   if (!row || !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
+  if (row.dataset.action === "edit-inline-allocation") {
+    allocationDetailEditing = true;
+    renderAllocationDetail();
+    return;
+  }
   if (row.dataset.action === "edit-project-entry" && selectedProject()?.status === "settled") return;
   openDialog(row.dataset.kind || (row.dataset.action === "edit-project-entry" ? "projectEntry" : "expense"), row.dataset.id);
 });
@@ -1649,6 +1736,8 @@ function toggleFundPin(id) {
 
 function showDashboard() {
   resetDetailTransitions();
+  closeRecordFilterMenu();
+  closeAddRecordMenu();
   const returnTab = detailReturnTab || "home";
   selectedFundId = null;
   selectedProjectId = null;
@@ -1673,6 +1762,8 @@ function showAllocationDetail(edit = false) {
 function showTab(tab) {
   const nextTab = ["home", "records", "projects", "settings"].includes(tab) ? tab : "home";
   saveActiveTabScroll();
+  closeRecordFilterMenu();
+  closeAddRecordMenu();
   activeTab = nextTab;
   selectedFundId = null;
   selectedProjectId = null;
@@ -1839,9 +1930,9 @@ function openDialog(mode, id = null, defaults = {}) {
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
-  const canDeleteExpense = mode === "expense" && Boolean(id);
-  els.deleteDialogBtn.hidden = !canDeleteExpense;
-  els.deleteDialogBtn.textContent = t("deleteExpense");
+  const canDelete = ["expense", "project"].includes(mode) && Boolean(id);
+  els.deleteDialogBtn.hidden = !canDelete;
+  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
   if (!els.dialog.open) {
     lockBackgroundScroll();
@@ -1870,9 +1961,6 @@ function fieldTemplates(mode, item) {
   if (mode === "fund") {
     return `
       ${field(t("name"), "name", item.name || "", "text")}
-      ${field(t("startingBalance"), "start", item.start || 0, "number")}
-      ${field(t("monthlyAllocation"), "allocation", item.allocation || 0, "number")}
-      ${field(t("targetAmount"), "target", item.target || 0, "number")}
     `;
   }
 
@@ -1880,14 +1968,8 @@ function fieldTemplates(mode, item) {
     const funds = currentMonth().funds
       .map(fund => `<option value="${fund.id}" ${item.defaultFundId === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
       .join("");
-    const types = ["travel", "event", "shopping", "moving", "other"]
-      .map(type => `<option value="${type}" ${item.type === type ? "selected" : ""}>${escapeHtml(projectTypeLabel(type))}</option>`)
-      .join("");
     return `
       ${field(t("name"), "name", item.name || "", "text")}
-      <label class="field">${t("projectType")}
-        <select name="type">${types}</select>
-      </label>
       <label class="field">${t("defaultFund")}
         <select name="defaultFundId">${funds}</select>
       </label>
@@ -1903,10 +1985,9 @@ function fieldTemplates(mode, item) {
       .join("");
     return `
       ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
-      <label class="field">${t("fund")}
+      <label class="field">${t("category")}
         <select name="fundId">${funds}</select>
       </label>
-      ${field(t("category"), "category", item.category || "", "text")}
       ${field(t("note"), "note", item.note || "", "text")}
       ${field(t("amount"), "amount", item.amount || "", "number")}
     `;
@@ -1951,7 +2032,7 @@ function renderAllocationEditor() {
     <section class="quick-allocation-card">
       <h3>${t("quickAdd")}</h3>
       <div class="quick-allocation-grid">
-        <label class="field compact">${t("fund")}
+        <label class="field compact">${t("category")}
           <select name="quickFundId">
             ${funds.map(fund => `<option value="${fund.id}">${escapeHtml(fund.name)}</option>`).join("")}
           </select>
@@ -1982,7 +2063,7 @@ function renderAllocationEditor() {
       <table class="allocation-editor-table">
         <thead>
           <tr>
-            <th>${t("fund")}</th>
+            <th>${t("category")}</th>
             <th>${t("allocated")}</th>
             <th>${t("percentIncome")}</th>
           </tr>
@@ -2063,14 +2144,16 @@ function saveEntry(event) {
     alert(t("validAmount"));
     return;
   }
+  if (dialogMode === "fund" && !payload.name) return;
 
   let affectsLaterMonthStarts = dialogMode === "expense";
+  let fundRename = null;
   if (dialogMode === "fund" && editingId) {
     const previous = month[key].find(item => item.id === editingId);
-    affectsLaterMonthStarts = previous && (
-      Number(previous.start || 0) !== Number(payload.start || 0) ||
-      Number(previous.allocation || 0) !== Number(payload.allocation || 0)
-    );
+    if (previous && previous.name !== payload.name) {
+      affectsLaterMonthStarts = true;
+      fundRename = { previousName: previous.name, nextName: payload.name };
+    }
   }
 
   if (affectsLaterMonthStarts && !confirmLaterMonthUpdate()) return;
@@ -2085,15 +2168,14 @@ function saveEntry(event) {
       markFundUpdatedByName(previous.category);
       markFundUpdatedByName(payload.category);
     }
-    if (dialogMode === "fund" && (
-      Number(previous.start || 0) !== Number(payload.start || 0) ||
-      Number(previous.allocation || 0) !== Number(payload.allocation || 0)
-    )) {
+    if (dialogMode === "fund" && fundRename) {
+      renameCategoryRecords(fundRename.previousName, fundRename.nextName);
       month[key][index].updatedAt = nowStamp();
     }
   } else {
     const stamp = nowStamp();
-    const created = { id: crypto.randomUUID(), ...payload, createdAt: stamp, updatedAt: stamp };
+    const defaults = dialogMode === "fund" ? { start: 0, allocation: 0, target: 0 } : {};
+    const created = { id: crypto.randomUUID(), ...defaults, ...payload, createdAt: stamp, updatedAt: stamp };
     if (dialogMode === "expense") {
       markFundUpdatedByName(payload.category);
     }
@@ -2106,6 +2188,38 @@ function saveEntry(event) {
   saveState();
   els.dialog.close();
   render();
+}
+
+function renameCategoryRecords(previousName, nextName) {
+  if (!previousName || !nextName || previousName === nextName) return;
+
+  sortedMonthKeys()
+    .filter(key => key >= state.currentMonth)
+    .forEach(key => {
+      const month = state.months[key];
+      month.funds.forEach(fund => {
+        if (fund.name === previousName) {
+          fund.name = nextName;
+          fund.updatedAt = nowStamp();
+        }
+      });
+      month.expenses.forEach(expense => {
+        if (expense.category === previousName) {
+          expense.category = nextName;
+          expense.updatedAt = nowStamp();
+        }
+      });
+    });
+}
+
+function deleteCurrentDialogItem() {
+  if (dialogMode === "expense") {
+    deleteCurrentExpense();
+    return;
+  }
+  if (dialogMode === "project") {
+    deleteCurrentProject();
+  }
 }
 
 function deleteCurrentExpense() {
@@ -2127,6 +2241,57 @@ function deleteCurrentExpense() {
   cascadeLaterMonthStarts();
   saveState();
   els.dialog.close();
+  dialogMode = null;
+  editingId = null;
+  render();
+}
+
+function deleteCurrentProject() {
+  if (dialogMode !== "project" || !editingId) return;
+  deleteProjectById(editingId, true);
+}
+
+function deleteSelectedProject() {
+  const project = selectedProject();
+  if (!project) return;
+  deleteProjectById(project.id, false);
+}
+
+function deleteProjectById(projectId, closeDialogAfterDelete) {
+  const project = state.projects.find(item => item.id === projectId);
+  if (!project) return;
+
+  const isSettled = project.status === "settled";
+  const message = isSettled
+    ? t("deleteSettledProjectConfirm", project.name)
+    : t("deleteProjectConfirm", project.name);
+  if (!window.confirm(message)) return;
+
+  const month = state.months[project.monthId] || currentMonth();
+  const settlementIds = new Set(project.settlementExpenseIds || []);
+  let removedLinkedExpense = false;
+
+  if (isSettled && settlementIds.size) {
+    if (!confirmLaterMonthUpdate()) return;
+    month.expenses = month.expenses.filter(expense => {
+      if (!settlementIds.has(expense.id)) return true;
+      markFundUpdatedByNameInMonth(month, expense.category);
+      removedLinkedExpense = true;
+      return false;
+    });
+  }
+
+  state.projects = state.projects.filter(item => item.id !== project.id);
+  selectedProjectId = null;
+  detailReturnTab = "projects";
+  activeTab = "projects";
+
+  if (removedLinkedExpense) {
+    cascadeLaterMonthStarts();
+  }
+
+  saveState();
+  if (closeDialogAfterDelete) els.dialog.close();
   dialogMode = null;
   editingId = null;
   render();
@@ -2257,7 +2422,6 @@ function transferAllocation(data) {
 function saveProject(data) {
   const payload = {
     name: data.name.trim(),
-    type: data.type || "other",
     defaultFundId: data.defaultFundId,
     startDate: data.startDate,
     endDate: data.endDate
@@ -2273,6 +2437,7 @@ function saveProject(data) {
   } else {
     const project = {
       id: crypto.randomUUID(),
+      type: "other",
       ...payload,
       monthId: state.currentMonth,
       status: "active",
@@ -2305,7 +2470,7 @@ function saveProjectEntry(data) {
   const payload = {
     date: data.date,
     fundId: data.fundId || project.defaultFundId,
-    category: data.category.trim(),
+    category: fundNameById(data.fundId || project.defaultFundId) || "",
     note: data.note.trim(),
     amount
   };
@@ -2398,7 +2563,11 @@ function unlinkSettlementExpense(expense) {
 }
 
 function markFundUpdatedByName(name) {
-  const fund = currentMonth().funds.find(item => item.name === name);
+  markFundUpdatedByNameInMonth(currentMonth(), name);
+}
+
+function markFundUpdatedByNameInMonth(month, name) {
+  const fund = month?.funds?.find(item => item.name === name);
   if (fund) fund.updatedAt = nowStamp();
 }
 
@@ -2417,10 +2586,7 @@ function normalizePayload(mode, data) {
   }
   if (mode === "fund") {
     return {
-      name: data.name.trim(),
-      start: requireMoney(data.start),
-      allocation: requireMoney(data.allocation),
-      target: requireMoney(data.target)
+      name: data.name.trim()
     };
   }
   return {

@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=no-recent-home-1">
+    <link rel="stylesheet" href="styles.css?v=project-hero-2">
   </head>
   <body>
     <div class="app-shell">
@@ -48,30 +48,6 @@
       </section>
 
       <main>
-        <section class="money-dashboard" aria-label="Monthly money dashboard">
-          <article class="metric income">
-            <div class="metric-copy">
-              <span>Total Income</span>
-              <strong id="totalIncome">0.00</strong>
-            </div>
-            <button id="quickIncomeBtn" class="metric-action" type="button">Add</button>
-          </article>
-          <article class="metric allocated">
-            <div class="metric-copy">
-              <span>Allocated</span>
-              <strong id="allocatedAmount">0.00</strong>
-            </div>
-            <button id="moveFundsBtn" class="metric-action" type="button">Move</button>
-          </article>
-          <article class="metric left">
-            <div class="metric-copy">
-              <span>Unallocated</span>
-              <strong id="unallocatedAmount">0.00</strong>
-            </div>
-            <button id="allocateIncomeBtn" class="metric-action" type="button">Allocate</button>
-          </article>
-        </section>
-
         <section id="dashboardView">
           <section id="incomeStorageCard" class="panel income-storage-card" data-action="view-allocation-detail" role="button" tabindex="0" aria-label="View income allocation details">
             <div class="storage-head">
@@ -82,6 +58,20 @@
               <span class="chevron" aria-hidden="true">›</span>
             </div>
             <div id="allocationBar" class="allocation-bar" aria-label="Income allocation chart"></div>
+            <div class="storage-stats">
+              <article class="metric income">
+                <span>Total Income</span>
+                <strong id="storageTotalIncome">0.00</strong>
+              </article>
+              <article class="metric allocated">
+                <span>Allocated</span>
+                <strong id="storageAllocatedAmount">0.00</strong>
+              </article>
+              <article class="metric left">
+                <span>Unallocated</span>
+                <strong id="storageUnallocatedAmount">0.00</strong>
+              </article>
+            </div>
             <div id="allocationLegend" class="allocation-legend"></div>
           </section>
 
@@ -90,19 +80,20 @@
               <div class="fund-title-row">
                 <h2>Available Balance</h2>
                 <div class="fund-primary-actions">
-                  <button id="quickExpenseBtn" type="button">Log</button>
-                  <button id="addFundBtn" class="add-fund-icon" type="button" aria-label="Add fund">+</button>
+                  <button id="quickMoveBtn" class="secondary-action" type="button">Move</button>
+                  <button id="quickExpenseBtn" type="button">Add</button>
+                  <button id="addFundBtn" class="add-fund-icon" type="button" aria-label="Add category">+</button>
                 </div>
               </div>
               <div class="fund-tools">
-                <label class="search-field" aria-label="Search funds">
-                  <input id="fundSearchInput" type="search" placeholder="Search funds" autocomplete="off">
+                <label class="search-field" aria-label="Search categories">
+                  <input id="fundSearchInput" type="search" placeholder="Search categories" autocomplete="off">
                   <div id="fundSearchResults" class="search-results" hidden></div>
                 </label>
                 <label class="sort-field">
                   <span class="sort-label">Sort</span>
                   <span class="sort-display" aria-hidden="true">Sort</span>
-                  <select id="fundSortSelect" aria-label="Sort funds">
+                  <select id="fundSortSelect" aria-label="Sort categories">
                     <option value="available-desc">Most available</option>
                     <option value="available-asc">Least available</option>
                     <option value="updated-desc">Recently updated</option>
@@ -118,27 +109,26 @@
 
         <section id="recordsView" class="tab-view" hidden>
           <section class="panel records-panel">
-            <div class="panel-title">
+            <div class="panel-title records-title-row">
               <h2>Records</h2>
-              <div class="record-actions">
-                <label class="record-search" aria-label="Search records">
-                  <input id="recordSearchInput" type="search" placeholder="Search date, category, note, amount" autocomplete="off">
-                </label>
-                <div class="record-filter-menu">
-                  <button id="recordFilterBtn" class="record-filter-btn" type="button" aria-expanded="false">All Records</button>
-                  <div id="recordFilterPanel" class="record-filter-panel" hidden></div>
-                </div>
-                <div class="record-add-menu">
-                  <button id="addRecordBtn" type="button" aria-expanded="false">Add</button>
-                  <div id="addRecordMenu" class="record-add-panel" hidden>
-                    <button id="addRecordIncomeBtn" type="button">Income</button>
-                    <button id="addRecordExpenseBtn" type="button">Expense</button>
-                  </div>
+              <div class="record-add-menu">
+                <button id="addRecordBtn" class="primary-action" type="button" aria-expanded="false">Add</button>
+                <div id="addRecordMenu" class="record-add-panel" hidden>
+                  <button id="addRecordIncomeBtn" type="button">Income</button>
+                  <button id="addRecordExpenseBtn" type="button">Expense</button>
                 </div>
               </div>
             </div>
+            <div class="record-actions">
+              <label class="record-search" aria-label="Search records">
+                <input id="recordSearchInput" type="search" placeholder="Search records" autocomplete="off">
+              </label>
+              <div class="record-filter-menu">
+                <button id="recordFilterBtn" class="record-filter-btn" type="button" aria-expanded="false">Filter</button>
+              </div>
+            </div>
             <div class="table-wrap">
-              <table class="records-table">
+              <table class="records-table compact-data-table">
                 <thead>
                   <tr>
                     <th>Date</th>
@@ -151,13 +141,14 @@
               </table>
             </div>
           </section>
+          <div id="recordFilterPanel" class="record-filter-panel" hidden></div>
         </section>
 
         <section id="projectsView" class="tab-view" hidden>
           <section class="panel projects-panel">
             <div class="panel-title compact-title">
               <h2>Projects</h2>
-              <button id="addProjectBtn" type="button">Add</button>
+              <button id="addProjectBtn" class="primary-action" type="button">Add</button>
             </div>
             <div id="projectsList" class="projects-list"></div>
           </section>
@@ -215,11 +206,9 @@
                 <p class="eyebrow">Income Allocation Detail</p>
                 <h2>Income Storage</h2>
               </div>
-              <div class="detail-balance">
-                <span>Allocated</span>
-                <strong id="allocationDetailPercent">0%</strong>
-              </div>
+              <button id="allocationDetailAddIncomeBtn" class="primary-action" type="button">Add</button>
             </div>
+            <p id="allocationDetailPercent" class="allocation-detail-summary">0.00 / 0.00 allocated (0% allocated)</p>
             <div id="allocationDetailBar" class="allocation-bar large" aria-label="Income allocation detail chart"></div>
             <div class="detail-stats">
               <article class="metric income">
@@ -239,22 +228,17 @@
 
           <section class="panel expense-panel">
             <div class="panel-title">
-              <h2>Fund Allocation</h2>
-              <div class="inline-actions">
-                <button type="button" id="allocationDetailMoveBtn" data-action="open-transfer">Move</button>
-              </div>
+              <h2>Category Allocation</h2>
             </div>
             <div id="allocationDetailEditActions" class="allocation-edit-actions" hidden>
               <button type="button" id="allocationDetailCancelBtn" class="secondary-action" hidden>Cancel</button>
               <button type="button" id="allocationDetailSaveBtn" hidden>Save</button>
             </div>
             <div class="table-wrap">
-              <table class="allocation-detail-table">
+              <table class="allocation-detail-table compact-data-table">
                 <thead>
                   <tr>
-                    <th>Fund</th>
-                    <th class="number">Allocated</th>
-                    <th class="number">% Income</th>
+                    <th>Category Allocation</th>
                   </tr>
                 </thead>
                 <tbody id="allocationDetailTable"></tbody>
@@ -269,7 +253,7 @@
             <div class="detail-primary">
               <div>
                 <p class="eyebrow">Balance Detail</p>
-                <h2 id="detailFundName">Fund</h2>
+                <button id="detailFundName" class="detail-name-button" type="button">Category</button>
               </div>
               <div class="detail-balance">
                 <span>Available</span>
@@ -287,7 +271,7 @@
                 <strong id="detailAllocation">0.00</strong>
               </article>
               <article class="metric spent">
-                <span>Spent in This Fund</span>
+                <span>Spent in This Category</span>
                 <strong id="detailSpent">0.00</strong>
               </article>
             </div>
@@ -297,12 +281,12 @@
             <div class="panel-title">
               <h2>Expenses</h2>
               <div class="inline-actions">
-                <button id="detailEditFundBtn" type="button">Edit Fund</button>
-                <button id="detailAddExpenseBtn" type="button">Log Expense</button>
+                <button id="detailMoveBtn" class="secondary-action" type="button">Move</button>
+                <button id="detailAddExpenseBtn" type="button">Add</button>
               </div>
             </div>
             <div class="table-wrap">
-              <table class="detail-expense-table">
+              <table class="detail-expense-table compact-data-table">
                 <thead>
                   <tr>
                     <th>
@@ -318,7 +302,6 @@
                         <span class="sort-arrow" aria-hidden="true"></span>
                       </button>
                     </th>
-                    <th class="action-cell"></th>
                   </tr>
                 </thead>
                 <tbody id="detailExpenseTable"></tbody>
@@ -330,32 +313,26 @@
         <section id="projectDetailView" class="detail-view" hidden>
           <button id="backToProjectsBtn" type="button" class="back-btn">← Projects</button>
           <section class="panel detail-hero project-hero">
-            <div class="detail-primary">
-              <div>
-                <p class="eyebrow">Project</p>
-                <h2 id="projectDetailName">Project</h2>
-              </div>
-              <div class="detail-balance">
-                <span>Status</span>
-                <strong id="projectDetailStatus">Active</strong>
-              </div>
+            <div class="project-title-line">
+              <button id="projectDetailName" class="project-name-button" type="button">Project</button>
+              <strong id="projectDetailStatus" class="status-pill is-active"><i></i><span>Active</span></strong>
             </div>
-            <div class="project-total-row">
-              <div>
-                <span>Total Spent</span>
-                <strong id="projectDetailTotal">0.00</strong>
-              </div>
-              <div>
-                <span>Default Fund</span>
-                <strong id="projectDetailDefaultFund">-</strong>
-              </div>
+            <div class="project-money-line">
+              <strong id="projectDetailTotal">0.00</strong>
+              <button id="projectDetailMetaBtn" class="project-meta-button" type="button">
+                <span id="projectDetailDates">May 1 - May 6</span>
+                <span id="projectDetailDefaultFund">Savings</span>
+              </button>
             </div>
-            <p id="projectDetailDates" class="project-date-range"></p>
+            <div class="project-hero-actions">
+              <button id="deleteProjectBtn" class="danger-action" type="button">Delete</button>
+              <button id="settleProjectBtn" class="primary-action" type="button">Settle</button>
+            </div>
           </section>
 
           <section class="panel project-breakdown-panel">
             <div class="panel-title compact-title">
-              <h2>Fund Breakdown</h2>
+              <h2>Category Breakdown</h2>
             </div>
             <div id="projectBreakdownBar" class="allocation-bar project-breakdown-bar"></div>
             <div id="projectBreakdownList" class="project-breakdown-list"></div>
@@ -365,12 +342,22 @@
             <div class="panel-title">
               <h2>Entries</h2>
               <div class="inline-actions">
-                <button id="editProjectBtn" type="button">Edit</button>
-                <button id="addProjectEntryBtn" type="button">Add Entry</button>
-                <button id="settleProjectBtn" type="button">Settle</button>
+                <button id="addProjectEntryBtn" class="primary-action" type="button">Add</button>
               </div>
             </div>
-            <div id="projectEntriesList" class="project-entries-list"></div>
+            <div class="table-wrap project-entries-wrap">
+              <table class="project-entries-table compact-data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Note</th>
+                    <th class="number">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="projectEntriesList"></tbody>
+              </table>
+            </div>
           </section>
         </section>
 
@@ -401,13 +388,13 @@
         <h2 id="dialogTitle" tabindex="-1">Add</h2>
         <div id="formFields" class="form-fields"></div>
         <menu>
-          <button type="button" id="deleteDialogBtn" class="dialog-delete-btn" hidden>Delete Expense</button>
+          <button type="button" id="deleteDialogBtn" class="dialog-delete-btn" hidden>Delete</button>
           <button value="cancel" type="button" id="cancelDialogBtn">Cancel</button>
           <button value="default" type="submit">Save</button>
         </menu>
       </form>
     </dialog>
 
-    <script src="app.js?v=no-recent-home-1"></script>
+    <script src="app.js?v=project-hero-2"></script>
   </body>
 </html>
