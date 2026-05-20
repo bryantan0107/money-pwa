@@ -630,24 +630,35 @@ function normalizeStateLanguage(rawState) {
     project.type = project.type || "other";
     project.status = project.status || "active";
     project.monthId = project.monthId || rawState.currentMonth;
+    project.createdAt = project.createdAt || fallbackTimestamp(project.startDate || `${project.monthId || rawState.currentMonth}-01`);
+    project.updatedAt = project.updatedAt || project.createdAt;
     project.entries = Array.isArray(project.entries) ? project.entries : [];
     project.settlementExpenseIds = Array.isArray(project.settlementExpenseIds) ? project.settlementExpenseIds : [];
     project.entries.forEach(entry => {
       entry.category = translateNote(entry.category || "");
       entry.note = translateNote(entry.note || "");
+      entry.createdAt = entry.createdAt || fallbackTimestamp(entry.date || project.startDate || `${project.monthId || rawState.currentMonth}-01`);
+      entry.updatedAt = entry.updatedAt || entry.createdAt;
     });
   });
-  Object.values(rawState.months || {}).forEach(month => {
+  Object.entries(rawState.months || {}).forEach(([monthId, month]) => {
     month.incomes?.forEach(income => {
       income.name = translateName(income.name);
+      income.date = income.date || `${monthId}-01`;
+      income.createdAt = income.createdAt || fallbackTimestamp(income.date);
+      income.updatedAt = income.updatedAt || income.createdAt;
     });
     month.funds?.forEach(fund => {
       fund.name = translateName(fund.name);
       fund.pinned = Boolean(fund.pinned);
+      fund.createdAt = fund.createdAt || fallbackTimestamp(`${monthId}-01`);
+      fund.updatedAt = fund.updatedAt || "";
     });
     month.expenses?.forEach(expense => {
       expense.category = translateName(expense.category);
       expense.note = translateNote(expense.note);
+      expense.createdAt = expense.createdAt || fallbackTimestamp(expense.date);
+      expense.updatedAt = expense.updatedAt || expense.createdAt;
     });
     month.debts?.forEach(debt => {
       debt.person = translateName(debt.person);
@@ -761,10 +772,14 @@ function formatRealMonthId() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function todayForCurrentMonth() {
+function localDateId(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function defaultEntryDateForCurrentMonth() {
   const realMonth = formatRealMonthId();
   if (realMonth === state.currentMonth) {
-    return new Date().toISOString().slice(0, 10);
+    return localDateId();
   }
   return `${state.currentMonth}-01`;
 }
@@ -1139,11 +1154,7 @@ function saveInlineAllocationDetail() {
 
 function renderRecentExpenses() {
   const expenses = [...currentMonth().expenses]
-    .sort((a, b) => {
-      const aKey = a.updatedAt || a.date || "";
-      const bKey = b.updatedAt || b.date || "";
-      return bKey.localeCompare(aKey);
-    })
+    .sort(compareExpensesByLedgerOrder)
     .slice(0, 5);
 
   els.recentExpenseList.innerHTML = expenses.length
@@ -1284,11 +1295,11 @@ function compareDetailExpenses(a, b) {
   if (detailExpenseSort.field === "amount") {
     const amountDiff = a.amount - b.amount;
     if (amountDiff !== 0) return amountDiff * direction;
-    return b.date.localeCompare(a.date);
+    return compareExpensesByLedgerOrder(a, b);
   }
   const dateDiff = a.date.localeCompare(b.date);
   if (dateDiff !== 0) return dateDiff * direction;
-  return 0;
+  return compareRecordTime(a, b) * direction;
 }
 
 function toggleDetailExpenseSort(field) {
@@ -1393,7 +1404,9 @@ function unifiedRecords() {
       date: income.date || `${state.currentMonth}-01`,
       category: t("income"),
       note: income.name,
-      amount: Number(income.amount || 0)
+      amount: Number(income.amount || 0),
+      createdAt: income.createdAt,
+      updatedAt: income.updatedAt
     })),
     ...month.expenses.map(expense => ({
       id: expense.id,
@@ -1401,7 +1414,9 @@ function unifiedRecords() {
       date: expense.date,
       category: expense.category,
       note: expense.note || "",
-      amount: Number(expense.amount || 0)
+      amount: Number(expense.amount || 0),
+      createdAt: expense.createdAt,
+      updatedAt: expense.updatedAt
     }))
   ];
 }
@@ -1410,7 +1425,27 @@ function compareRecords(a, b) {
   const dateDiff = b.date.localeCompare(a.date);
   if (dateDiff !== 0) return dateDiff;
   if (a.kind !== b.kind) return a.kind === "expense" ? -1 : 1;
+  const timeDiff = compareRecordTime(a, b);
+  if (timeDiff !== 0) return timeDiff;
   return b.amount - a.amount;
+}
+
+function compareExpensesByLedgerOrder(a, b) {
+  const dateDiff = b.date.localeCompare(a.date);
+  if (dateDiff !== 0) return dateDiff;
+  const timeDiff = compareRecordTime(a, b);
+  if (timeDiff !== 0) return timeDiff;
+  const amountDiff = Number(b.amount || 0) - Number(a.amount || 0);
+  if (amountDiff !== 0) return amountDiff;
+  return `${a.category || ""}${a.note || ""}`.localeCompare(`${b.category || ""}${b.note || ""}`);
+}
+
+function compareRecordTime(a, b) {
+  return recordTimeKey(b).localeCompare(recordTimeKey(a));
+}
+
+function recordTimeKey(record) {
+  return record.createdAt || record.updatedAt || fallbackTimestamp(record.date);
 }
 
 function recordMatchesFilter(record, filter) {
@@ -1885,7 +1920,7 @@ function fieldTemplates(mode, item) {
       .map(fund => `<option value="${fund.id}" ${(item.fundId || project?.defaultFundId) === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
       .join("");
     return `
-      ${field(t("date"), "date", item.date || todayForCurrentMonth(), "date")}
+      ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
       <label class="field">${t("fund")}
         <select name="fundId">${funds}</select>
       </label>
@@ -1918,7 +1953,7 @@ function fieldTemplates(mode, item) {
     .map(fund => `<option value="${escapeAttr(fund.name)}" ${item.category === fund.name ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
     .join("");
   return `
-    ${field(t("date"), "date", item.date || state.currentMonth + "-16", "date")}
+    ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
     <label class="field">${t("category")}
       <select name="category">${categories}</select>
     </label>
@@ -2062,10 +2097,11 @@ function saveEntry(event) {
     const index = month[key].findIndex(item => item.id === editingId);
     const previous = month[key][index];
     month[key][index] = { ...month[key][index], ...payload };
+    month[key][index].createdAt = month[key][index].createdAt || fallbackTimestamp(month[key][index].date || `${state.currentMonth}-01`);
+    month[key][index].updatedAt = nowStamp();
     if (dialogMode === "expense") {
       markFundUpdatedByName(previous.category);
       markFundUpdatedByName(payload.category);
-      month[key][index].updatedAt = nowStamp();
     }
     if (dialogMode === "fund" && (
       Number(previous.start || 0) !== Number(payload.start || 0) ||
@@ -2074,13 +2110,10 @@ function saveEntry(event) {
       month[key][index].updatedAt = nowStamp();
     }
   } else {
-    const created = { id: crypto.randomUUID(), ...payload };
+    const stamp = nowStamp();
+    const created = { id: crypto.randomUUID(), ...payload, createdAt: stamp, updatedAt: stamp };
     if (dialogMode === "expense") {
-      created.updatedAt = nowStamp();
       markFundUpdatedByName(payload.category);
-    }
-    if (dialogMode === "fund") {
-      created.updatedAt = nowStamp();
     }
     month[key].push(created);
   }
@@ -2304,12 +2337,13 @@ function settleProject(project) {
   if (!confirmLaterMonthUpdate()) return;
 
   const month = currentMonth();
-  const settlementDate = project.endDate || todayForCurrentMonth();
+  const settlementDate = project.endDate || defaultEntryDateForCurrentMonth();
   const createdIds = [];
 
   breakdown.forEach(item => {
     const fund = month.funds.find(entry => entry.id === item.fundId);
     if (!fund) return;
+    const stamp = nowStamp();
     const expense = {
       id: crypto.randomUUID(),
       date: settlementDate,
@@ -2317,7 +2351,8 @@ function settleProject(project) {
       note: project.name,
       amount: item.amount,
       projectId: project.id,
-      updatedAt: nowStamp()
+      createdAt: stamp,
+      updatedAt: stamp
     };
     month.expenses.push(expense);
     createdIds.push(expense.id);
@@ -2355,6 +2390,10 @@ function markFundUpdatedByName(name) {
 
 function nowStamp() {
   return new Date().toISOString();
+}
+
+function fallbackTimestamp(date) {
+  return `${date || "1970-01-01"}T00:00:00.000Z`;
 }
 
 function normalizePayload(mode, data) {
@@ -2528,6 +2567,7 @@ function createMonthRecord(monthId) {
       allocation: 0,
       target: Number(fund.target || 0),
       pinned: Boolean(fund.pinned),
+      createdAt: fallbackTimestamp(`${monthId}-01`),
       updatedAt: fund.updatedAt || ""
     })),
     expenses: [],

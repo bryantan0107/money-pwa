@@ -57,6 +57,9 @@ This file records long-term product direction and user preferences for this proj
 - Home is the main daily-use screen.
 - Records should combine income and expense records, with search and filtering designed for quick lookup.
 - Records filters should use compact white popovers with clear grouping, not large modals or cramped native dropdowns.
+- Recent Expenses and Records should both use ledger-style date-descending order.
+- Same-day records should use hidden `createdAt` timestamps as a tie-breaker, without showing or requiring a time field in normal forms.
+- Keep `createdAt` and `updatedAt` in the data model for income, expenses, funds, projects, and project entries to support future richer sorting/editing.
 - Projects are temporary ledgers for trips, events, shopping plans, moving, and other multi-entry situations.
 - Project entries do not directly affect fund balances. Only settlement creates official expense records.
 - A Project has one default fund, but each Project entry can choose its own fund.
