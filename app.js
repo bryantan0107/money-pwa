@@ -135,6 +135,7 @@ const I18N = {
       ? `Create ${month}? Starting balances will roll over from ${previous}.`
       : `Create ${month}? No previous month exists, so balances will start from 0.`,
     laterMonthChange: "This change affects later months. Choose OK to update later months, or Cancel to keep everything unchanged.",
+    laterMonthsUpdated: "Later months updated",
     overAllocated: amount => `Allocated amount is ${amount} over your total income.`,
     moveLimit: (amount, fund) => `You can move up to ${amount} from ${fund}.`,
     backupRecent: days => `Last backup was ${days} days ago. Save a backup file to iCloud Drive for peace of mind.`,
@@ -275,6 +276,7 @@ const I18N = {
       ? `创建 ${month}？起始余额会从 ${previous} 延续。`
       : `创建 ${month}？没有上一个月份，所以余额会从 0 开始。`,
     laterMonthChange: "这个修改会影响后续月份。点确认会更新后续月份，点取消则不修改。",
+    laterMonthsUpdated: "已更新后续月份",
     overAllocated: amount => `分配金额超过总收入 ${amount}。`,
     moveLimit: (amount, fund) => `最多可以从 ${fund} 移动 ${amount}。`,
     backupRecent: days => `上次备份是 ${days} 天前。建议导出备份并保存到 iCloud Drive。`,
@@ -407,6 +409,7 @@ let detailSwipeStart = null;
 let detailExpenseSort = { field: "date", direction: "desc" };
 let lockedScrollY = 0;
 let monthCalendarYear = Number(state.currentMonth.slice(0, 4));
+let toastTimer = null;
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -608,6 +611,11 @@ els.fundSearchInput.addEventListener("focus", renderFundSearchResults);
 els.form.addEventListener("submit", saveEntry);
 els.form.addEventListener("input", updateAllocationEditor);
 els.form.addEventListener("change", updateAllocationEditor);
+els.form.addEventListener("input", updateNoteAutocomplete);
+els.form.addEventListener("click", applyNoteSuggestion);
+els.form.addEventListener("keydown", event => {
+  if (event.key === "Escape") hideNoteSuggestions();
+});
 els.detailView.addEventListener("touchstart", startDetailSwipe, { passive: true });
 els.detailView.addEventListener("touchmove", moveDetailSwipe, { passive: false });
 els.detailView.addEventListener("touchend", finishDetailSwipe, { passive: true });
@@ -757,11 +765,36 @@ function cascadeLaterMonthStarts(fromMonthId = state.currentMonth) {
   });
 }
 
+function cascadeLaterMonthStartsQuietly(fromMonthId = state.currentMonth) {
+  const hadLaterMonths = hasLaterMonths(fromMonthId);
+  cascadeLaterMonthStarts(fromMonthId);
+  if (hadLaterMonths) showToast(t("laterMonthsUpdated"));
+}
+
 function finishBalanceMutation() {
-  cascadeLaterMonthStarts();
+  cascadeLaterMonthStartsQuietly();
   saveState();
   els.dialog.close();
   render();
+}
+
+function showToast(message) {
+  let toast = document.querySelector("#appToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "appToast";
+    toast.className = "app-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.classList.add("show");
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2200);
 }
 
 function selectedFund() {
@@ -1197,7 +1230,6 @@ function saveInlineAllocationDetail() {
   }
 
   const changed = updates.some(item => Number(item.fund.allocation || 0) !== item.amount);
-  if (changed && !confirmLaterMonthUpdate()) return;
 
   updates.forEach(item => {
     if (Number(item.fund.allocation || 0) !== item.amount) {
@@ -1206,7 +1238,7 @@ function saveInlineAllocationDetail() {
     }
   });
   if (changed) {
-    cascadeLaterMonthStarts();
+    cascadeLaterMonthStartsQuietly();
     saveState();
   }
   allocationDetailEditing = false;
@@ -2020,7 +2052,7 @@ function fieldTemplates(mode, item) {
     <label class="field">${t("category")}
       <select name="category">${categories}</select>
     </label>
-    ${field(t("note"), "note", item.note || "", "text")}
+    ${noteField(t("note"), item.note || "")}
     ${field(t("amount"), "amount", item.amount || "", "number")}
   `;
 }
@@ -2106,6 +2138,126 @@ function field(label, name, value, type) {
   `;
 }
 
+function noteField(label, value) {
+  return `
+    <label class="field note-autocomplete-field">${label}
+      <input name="note" type="text" value="${escapeAttr(value)}" autocomplete="off" data-note-autocomplete required>
+      <div class="note-suggestions" data-note-suggestions hidden></div>
+    </label>
+  `;
+}
+
+function updateNoteAutocomplete(event) {
+  if (dialogMode !== "expense" || !event.target?.matches("[data-note-autocomplete]")) return;
+
+  const panel = els.form.querySelector("[data-note-suggestions]");
+  if (!panel) return;
+
+  const suggestions = getNoteSuggestions(event.target.value);
+  if (!suggestions.length) {
+    hideNoteSuggestions();
+    return;
+  }
+
+  panel.innerHTML = suggestions.map(suggestion => `
+    <button type="button" class="note-suggestion" data-note="${escapeAttr(suggestion.note)}" data-category="${escapeAttr(suggestion.category)}">
+      <span>${escapeHtml(suggestion.note)}</span>
+      <small>${escapeHtml(suggestion.category)}</small>
+    </button>
+  `).join("");
+  panel.hidden = false;
+}
+
+function applyNoteSuggestion(event) {
+  const button = event.target.closest("[data-note][data-category]");
+  if (!button || dialogMode !== "expense") return;
+
+  const noteInput = els.form.elements.note;
+  const categorySelect = els.form.elements.category;
+  if (noteInput) noteInput.value = button.dataset.note;
+  if (categorySelect && [...categorySelect.options].some(option => option.value === button.dataset.category)) {
+    categorySelect.value = button.dataset.category;
+  }
+  hideNoteSuggestions();
+}
+
+function hideNoteSuggestions() {
+  const panel = els.form.querySelector("[data-note-suggestions]");
+  if (panel) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+  }
+}
+
+function getNoteSuggestions(query) {
+  const normalizedQuery = normalizeAutocompleteText(query);
+  if (!normalizedQuery) return [];
+
+  const currentCategories = new Set(currentMonth().funds.map(fund => fund.name));
+  const notes = new Map();
+
+  Object.values(state.months || {}).forEach(month => {
+    (month.expenses || []).forEach(expense => {
+      const note = String(expense.note || "").trim();
+      const category = expense.category;
+      if (!note || !category || !currentCategories.has(category)) return;
+
+      const normalizedNote = normalizeAutocompleteText(note);
+      if (!normalizedNote || !normalizedNote.includes(normalizedQuery)) return;
+
+      const key = normalizedNote;
+      const timestamp = Date.parse(expense.updatedAt || expense.createdAt || fallbackTimestamp(expense.date));
+      const entry = notes.get(key) || {
+        note,
+        normalizedNote,
+        count: 0,
+        latest: 0,
+        categories: new Map()
+      };
+      entry.count += 1;
+      entry.latest = Math.max(entry.latest, Number.isFinite(timestamp) ? timestamp : 0);
+      entry.note = note.length < entry.note.length ? note : entry.note;
+
+      const categoryEntry = entry.categories.get(category) || { category, count: 0, latest: 0 };
+      categoryEntry.count += 1;
+      categoryEntry.latest = Math.max(categoryEntry.latest, Number.isFinite(timestamp) ? timestamp : 0);
+      entry.categories.set(category, categoryEntry);
+      notes.set(key, entry);
+    });
+  });
+
+  return [...notes.values()]
+    .map(entry => {
+      const category = [...entry.categories.values()]
+        .sort((a, b) => b.count - a.count || b.latest - a.latest || a.category.localeCompare(b.category))[0]?.category || "";
+      return {
+        note: entry.note,
+        category,
+        count: entry.count,
+        latest: entry.latest,
+        rank: noteMatchRank(entry.normalizedNote, normalizedQuery)
+      };
+    })
+    .sort((a, b) => b.rank - a.rank || b.latest - a.latest || b.count - a.count || a.note.localeCompare(b.note))
+    .slice(0, 5);
+}
+
+function normalizeAutocompleteText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, " ")
+    .trim();
+}
+
+function noteMatchRank(note, query) {
+  if (note === query) return 4;
+  if (note.startsWith(query)) return 3;
+  if (note.split(" ").some(part => part.startsWith(query))) return 2;
+  return 1;
+}
+
 function saveEntry(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(els.form).entries());
@@ -2156,7 +2308,8 @@ function saveEntry(event) {
     }
   }
 
-  if (affectsLaterMonthStarts && !confirmLaterMonthUpdate()) return;
+  const needsLaterMonthConfirm = dialogMode === "fund" && Boolean(fundRename);
+  if (affectsLaterMonthStarts && needsLaterMonthConfirm && !confirmLaterMonthUpdate()) return;
 
   if (editingId) {
     const index = month[key].findIndex(item => item.id === editingId);
@@ -2183,7 +2336,7 @@ function saveEntry(event) {
   }
 
   if (affectsLaterMonthStarts) {
-    cascadeLaterMonthStarts();
+    cascadeLaterMonthStartsQuietly();
   }
   saveState();
   els.dialog.close();
@@ -2233,12 +2386,11 @@ function deleteCurrentExpense() {
     ? t("deleteSettledProjectExpenseConfirm")
     : t("deleteExpenseConfirm");
   if (!window.confirm(confirmMessage)) return;
-  if (!confirmLaterMonthUpdate()) return;
 
   month.expenses = month.expenses.filter(item => item.id !== editingId);
   markFundUpdatedByName(expense.category);
   unlinkSettlementExpense(expense);
-  cascadeLaterMonthStarts();
+  cascadeLaterMonthStartsQuietly();
   saveState();
   els.dialog.close();
   dialogMode = null;
@@ -2272,7 +2424,6 @@ function deleteProjectById(projectId, closeDialogAfterDelete) {
   let removedLinkedExpense = false;
 
   if (isSettled && settlementIds.size) {
-    if (!confirmLaterMonthUpdate()) return;
     month.expenses = month.expenses.filter(expense => {
       if (!settlementIds.has(expense.id)) return true;
       markFundUpdatedByNameInMonth(month, expense.category);
@@ -2287,7 +2438,7 @@ function deleteProjectById(projectId, closeDialogAfterDelete) {
   activeTab = "projects";
 
   if (removedLinkedExpense) {
-    cascadeLaterMonthStarts();
+    cascadeLaterMonthStartsQuietly();
   }
 
   saveState();
@@ -2378,7 +2529,11 @@ function saveAllocationEditor() {
   }
 
   const changed = updates.some(item => Number(item.fund.allocation || 0) !== item.amount);
-  if (changed && !confirmLaterMonthUpdate()) return;
+  if (!changed) {
+    els.dialog.close();
+    render();
+    return;
+  }
 
   updates.forEach(item => {
     if (Number(item.fund.allocation || 0) !== item.amount) {
@@ -2405,8 +2560,6 @@ function transferAllocation(data) {
     alert(t("moveLimit", money(fromAvailable), fromFund.name));
     return;
   }
-
-  if (!confirmLaterMonthUpdate()) return;
 
   const allocationMove = Math.min(Number(fromFund.allocation || 0), amount);
   const startMove = amount - allocationMove;
@@ -2505,7 +2658,6 @@ function settleProject(project) {
   const breakdown = projectBreakdown(project);
   if (!breakdown.length) return;
   if (!window.confirm(t("settleProjectConfirm", project.name, breakdown.length))) return;
-  if (!confirmLaterMonthUpdate()) return;
 
   const month = currentMonth();
   const settlementDate = project.endDate || defaultEntryDateForCurrentMonth();
@@ -2534,14 +2686,13 @@ function settleProject(project) {
   project.settlementExpenseIds = createdIds;
   project.settledAt = nowStamp();
   project.updatedAt = nowStamp();
-  cascadeLaterMonthStarts();
+  cascadeLaterMonthStartsQuietly();
   saveState();
   render();
 }
 
 function reopenProject(project) {
   if (!window.confirm(t("reopenProjectConfirm", project.name))) return;
-  if (!confirmLaterMonthUpdate()) return;
 
   const ids = new Set(project.settlementExpenseIds || []);
   const month = currentMonth();
@@ -2549,7 +2700,7 @@ function reopenProject(project) {
   project.status = "active";
   project.settlementExpenseIds = [];
   project.updatedAt = nowStamp();
-  cascadeLaterMonthStarts();
+  cascadeLaterMonthStartsQuietly();
   saveState();
   render();
 }
@@ -2654,14 +2805,14 @@ function chooseDecimalSeparator(input, lastDot, lastComma) {
 function removeItem(key, id) {
   const removed = currentMonth()[key].find(item => item.id === id);
   const affectsLaterMonthStarts = Boolean((key === "expenses" || key === "funds") && removed);
-  if (affectsLaterMonthStarts && !confirmLaterMonthUpdate()) return;
+  if (key === "funds" && affectsLaterMonthStarts && !confirmLaterMonthUpdate()) return;
 
   currentMonth()[key] = currentMonth()[key].filter(item => item.id !== id);
   if (key === "expenses" && removed) {
     markFundUpdatedByName(removed.category);
   }
   if (affectsLaterMonthStarts) {
-    cascadeLaterMonthStarts();
+    cascadeLaterMonthStartsQuietly();
   }
   saveState();
   render();
