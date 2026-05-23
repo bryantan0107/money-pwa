@@ -1,9 +1,9 @@
-const CACHE_NAME = "money-pwa-v93";
+const CACHE_NAME = "money-pwa-v95";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=smart-entry-1",
-  "./app.js?v=smart-entry-1",
+  "./styles.css?v=expense-category-balance-1",
+  "./app.js?v=expense-category-balance-1",
   "./manifest.webmanifest",
   "./icon.svg"
 ];

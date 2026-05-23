@@ -4,6 +4,7 @@ const DISMISSED_BACKUP_KEY = "monthly-money-manager-backup-dismissed";
 const BACKUP_REMINDER_DAYS = 7;
 const DEFAULT_FUND_SORT = "available-desc";
 const DEFAULT_LANGUAGE = "en";
+const DATA_VERSION = 2;
 const I18N = {
   en: {
     appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
@@ -329,6 +330,8 @@ const ENGLISH_STATUS_MAP = {
 
 const initialData = {
   currentMonth: "2026-05",
+  dataVersion: DATA_VERSION,
+  languageNormalized: true,
   language: DEFAULT_LANGUAGE,
   privacyMode: false,
   fundSort: DEFAULT_FUND_SORT,
@@ -643,19 +646,26 @@ function loadState() {
     if (!parsed.language) parsed.language = DEFAULT_LANGUAGE;
     if (!Array.isArray(parsed.projects)) parsed.projects = [];
     parsed.privacyMode = Boolean(parsed.privacyMode);
-    return normalizeStateLanguage(parsed);
+    const normalized = normalizeStateLanguage(parsed);
+    if (normalized.languageNormalized && normalized.dataVersion === DATA_VERSION) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    }
+    return normalized;
   } catch {
     return normalizeStateLanguage(structuredClone(initialData));
   }
 }
 
 function normalizeStateLanguage(rawState) {
+  const shouldTranslateLegacyNames = rawState.languageNormalized !== true;
   if (!rawState.fundSort) rawState.fundSort = DEFAULT_FUND_SORT;
   if (!rawState.language) rawState.language = DEFAULT_LANGUAGE;
   if (!Array.isArray(rawState.projects)) rawState.projects = [];
+  rawState.dataVersion = DATA_VERSION;
+  rawState.languageNormalized = true;
   rawState.privacyMode = Boolean(rawState.privacyMode);
   rawState.projects.forEach(project => {
-    project.name = translateName(project.name || "");
+    project.name = shouldTranslateLegacyNames ? translateName(project.name || "") : (project.name || "");
     project.type = project.type || "other";
     project.status = project.status || "active";
     project.monthId = project.monthId || rawState.currentMonth;
@@ -672,25 +682,25 @@ function normalizeStateLanguage(rawState) {
   });
   Object.entries(rawState.months || {}).forEach(([monthId, month]) => {
     month.incomes?.forEach(income => {
-      income.name = translateName(income.name);
+      income.name = shouldTranslateLegacyNames ? translateName(income.name) : income.name;
       income.date = income.date || `${monthId}-01`;
       income.createdAt = income.createdAt || fallbackTimestamp(income.date);
       income.updatedAt = income.updatedAt || income.createdAt;
     });
     month.funds?.forEach(fund => {
-      fund.name = translateName(fund.name);
+      fund.name = shouldTranslateLegacyNames ? translateName(fund.name) : fund.name;
       fund.pinned = Boolean(fund.pinned);
       fund.createdAt = fund.createdAt || fallbackTimestamp(`${monthId}-01`);
       fund.updatedAt = fund.updatedAt || "";
     });
     month.expenses?.forEach(expense => {
-      expense.category = translateName(expense.category);
+      expense.category = shouldTranslateLegacyNames ? translateName(expense.category) : expense.category;
       expense.note = translateNote(expense.note);
       expense.createdAt = expense.createdAt || fallbackTimestamp(expense.date);
       expense.updatedAt = expense.updatedAt || expense.createdAt;
     });
     month.debts?.forEach(debt => {
-      debt.person = translateName(debt.person);
+      debt.person = shouldTranslateLegacyNames ? translateName(debt.person) : debt.person;
       debt.note = translateNote(debt.note);
       debt.status = translateStatus(debt.status);
     });
@@ -2045,7 +2055,7 @@ function fieldTemplates(mode, item) {
   }
 
   const categories = currentMonth().funds
-    .map(fund => `<option value="${escapeAttr(fund.name)}" ${item.category === fund.name ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
+    .map(fund => `<option value="${escapeAttr(fund.name)}" ${item.category === fund.name ? "selected" : ""}>${escapeHtml(fund.name)} · ${money(balanceFor(fund))}</option>`)
     .join("");
   return `
     ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
