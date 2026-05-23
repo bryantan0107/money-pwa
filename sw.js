@@ -1,9 +1,9 @@
-const CACHE_NAME = "money-pwa-v95";
+const CACHE_NAME = "money-pwa-v96";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=expense-category-balance-1",
-  "./app.js?v=expense-category-balance-1",
+  "./styles.css?v=pwa-update-1",
+  "./app.js?v=pwa-update-1",
   "./manifest.webmanifest",
   "./icon.svg"
 ];
@@ -12,7 +12,6 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -22,6 +21,12 @@ self.addEventListener("activate", event => {
       .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", event => {

@@ -5,6 +5,7 @@ const BACKUP_REMINDER_DAYS = 7;
 const DEFAULT_FUND_SORT = "available-desc";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
+const APP_VERSION = "2026.05.23";
 const I18N = {
   en: {
     appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
@@ -77,6 +78,15 @@ const I18N = {
     currencyText: "Euro is the current currency.",
     language: "Language",
     languageText: "Choose the app display language.",
+    updates: "Updates",
+    updatesText: "Check whether a newer app version is available.",
+    checkUpdates: "Check for updates",
+    checkingUpdates: "Checking for updates…",
+    upToDate: "You’re up to date.",
+    updateAvailable: "New version available",
+    updateNow: "Update now",
+    appVersion: "App version",
+    appVersionText: "Current installed version.",
     hideAmounts: "Hide amounts",
     showAmounts: "Show amounts",
     home: "Home",
@@ -218,6 +228,15 @@ const I18N = {
     currencyText: "当前货币是欧元。",
     language: "语言",
     languageText: "选择 app 显示语言。",
+    updates: "更新",
+    updatesText: "检查是否有新版 app 可用。",
+    checkUpdates: "检查更新",
+    checkingUpdates: "正在检查更新…",
+    upToDate: "已经是最新版本。",
+    updateAvailable: "有新版本可用",
+    updateNow: "立即更新",
+    appVersion: "应用版本",
+    appVersionText: "当前安装版本。",
     hideAmounts: "隐藏金额",
     showAmounts: "显示金额",
     home: "首页",
@@ -413,11 +432,16 @@ let detailExpenseSort = { field: "date", direction: "desc" };
 let lockedScrollY = 0;
 let monthCalendarYear = Number(state.currentMonth.slice(0, 4));
 let toastTimer = null;
+let updateRegistration = null;
+let refreshingForUpdate = false;
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
   privacyToggleBtn: document.querySelector("#privacyToggleBtn"),
   backupReminder: document.querySelector("#backupReminder"),
+  updateBanner: document.querySelector("#updateBanner"),
+  updateBannerTitle: document.querySelector("#updateBannerTitle"),
+  updateNowBtn: document.querySelector("#updateNowBtn"),
   backupReminderText: document.querySelector("#backupReminderText"),
   backupNowBtn: document.querySelector("#backupNowBtn"),
   dismissBackupBtn: document.querySelector("#dismissBackupBtn"),
@@ -487,6 +511,7 @@ const els = {
   monthGrid: document.querySelector("#monthGrid"),
   monthCalendarTitle: document.querySelector("#monthCalendarTitle"),
   languageSelect: document.querySelector("#languageSelect"),
+  checkUpdatesBtn: document.querySelector("#checkUpdatesBtn"),
   settingsBackupBtn: document.querySelector("#settingsBackupBtn"),
   settingsImportInput: document.querySelector("#settingsImportInput"),
   dialogTitle: document.querySelector("#dialogTitle"),
@@ -564,6 +589,8 @@ els.projectDetailMetaBtn.addEventListener("click", () => {
 });
 els.deleteProjectBtn.addEventListener("click", deleteSelectedProject);
 els.settleProjectBtn.addEventListener("click", settleOrReopenProject);
+els.updateNowBtn.addEventListener("click", activateWaitingServiceWorker);
+els.checkUpdatesBtn.addEventListener("click", checkForUpdates);
 els.languageSelect.addEventListener("change", event => {
   state.language = event.target.value;
   saveState();
@@ -1019,6 +1046,14 @@ function renderStaticLanguage() {
   document.querySelector(".settings-item:nth-child(3) p").textContent = t("currencyText");
   document.querySelector("#languageSettingTitle").textContent = t("language");
   document.querySelector("#languageSettingText").textContent = t("languageText");
+  document.querySelector("#updatesSettingTitle").textContent = t("updates");
+  document.querySelector("#updatesSettingText").textContent = t("updatesText");
+  els.checkUpdatesBtn.textContent = t("checkUpdates");
+  document.querySelector("#appVersionTitle").textContent = t("appVersion");
+  document.querySelector("#appVersionText").textContent = t("appVersionText");
+  document.querySelector("#appVersionValue").textContent = APP_VERSION;
+  els.updateBannerTitle.textContent = t("updateAvailable");
+  els.updateNowBtn.textContent = t("updateNow");
   document.querySelector(".bottom-nav [data-tab='home'] small").textContent = t("home");
   document.querySelector(".bottom-nav [data-tab='records'] small").textContent = t("records");
   document.querySelector(".bottom-nav [data-tab='projects'] small").textContent = t("projects");
@@ -2997,6 +3032,90 @@ function importData(event) {
   reader.readAsText(file);
 }
 
+async function checkForUpdates() {
+  if (!("serviceWorker" in navigator)) {
+    showToast(t("upToDate"));
+    return;
+  }
+
+  showToast(t("checkingUpdates"));
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) {
+    showToast(t("upToDate"));
+    return;
+  }
+
+  updateRegistration = registration;
+  watchServiceWorkerRegistration(registration);
+
+  try {
+    await registration.update();
+  } catch {
+    showToast(t("upToDate"));
+    return;
+  }
+
+  if (registration.waiting) {
+    showUpdateBanner(registration);
+    return;
+  }
+
+  const installing = registration.installing;
+  if (installing) {
+    waitForInstallingWorker(installing, registration, true);
+    return;
+  }
+
+  window.setTimeout(() => {
+    if (registration.waiting) {
+      showUpdateBanner(registration);
+    } else {
+      showToast(t("upToDate"));
+    }
+  }, 1200);
+}
+
+function showUpdateBanner(registration) {
+  updateRegistration = registration;
+  els.updateBanner.hidden = false;
+  showToast(t("updateAvailable"));
+}
+
+function activateWaitingServiceWorker() {
+  const waitingWorker = updateRegistration?.waiting;
+  if (!waitingWorker) {
+    showToast(t("checkingUpdates"));
+    checkForUpdates();
+    return;
+  }
+  waitingWorker.postMessage({ type: "SKIP_WAITING" });
+}
+
+function watchServiceWorkerRegistration(registration) {
+  if (!registration || registration.__moneyUpdateWatch) return;
+  registration.__moneyUpdateWatch = true;
+
+  if (registration.waiting) {
+    showUpdateBanner(registration);
+  }
+
+  registration.addEventListener("updatefound", () => {
+    const installing = registration.installing;
+    if (installing) waitForInstallingWorker(installing, registration, false);
+  });
+}
+
+function waitForInstallingWorker(worker, registration, notifyIfCurrent) {
+  worker.addEventListener("statechange", () => {
+    if (worker.state !== "installed") return;
+    if (navigator.serviceWorker.controller) {
+      showUpdateBanner(registration);
+    } else if (notifyIfCurrent) {
+      showToast(t("upToDate"));
+    }
+  });
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -3012,7 +3131,16 @@ function escapeAttr(value) {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("./sw.js").catch(() => {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshingForUpdate) return;
+    refreshingForUpdate = true;
+    window.location.reload();
+  });
+
+  navigator.serviceWorker.register("./sw.js").then(registration => {
+    updateRegistration = registration;
+    watchServiceWorkerRegistration(registration);
+  }).catch(() => {
     // Offline support is optional during local development.
   });
 }

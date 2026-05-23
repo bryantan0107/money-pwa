@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=expense-category-balance-1">
+    <link rel="stylesheet" href="styles.css?v=pwa-update-1">
   </head>
   <body>
     <div class="app-shell">
@@ -35,6 +35,13 @@
           </div>
         </div>
       </header>
+
+      <section id="updateBanner" class="update-banner" hidden>
+        <div>
+          <strong id="updateBannerTitle">New version available</strong>
+        </div>
+        <button id="updateNowBtn" type="button">Update now</button>
+      </section>
 
       <section id="backupReminder" class="backup-reminder" hidden>
         <div>
@@ -193,6 +200,20 @@
                   <option value="en">English</option>
                   <option value="zh">中文</option>
                 </select>
+              </article>
+              <article class="settings-item">
+                <div>
+                  <strong id="updatesSettingTitle">Updates</strong>
+                  <p id="updatesSettingText">Check whether a newer app version is available.</p>
+                </div>
+                <button id="checkUpdatesBtn" type="button">Check for updates</button>
+              </article>
+              <article class="settings-item passive">
+                <div>
+                  <strong id="appVersionTitle">App version</strong>
+                  <p id="appVersionText">Current installed version.</p>
+                </div>
+                <span id="appVersionValue">2026.05.23</span>
               </article>
             </div>
           </section>
@@ -395,6 +416,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=expense-category-balance-1"></script>
+    <script src="app.js?v=pwa-update-1"></script>
   </body>
 </html>
