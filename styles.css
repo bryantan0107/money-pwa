@@ -674,6 +674,41 @@ h2 {
   color: var(--red);
 }
 
+.quick-allocate-status,
+.quick-allocate-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quick-allocate-status article,
+.quick-allocate-preview article {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.quick-allocate-status span,
+.quick-allocate-preview span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.quick-allocate-status strong,
+.quick-allocate-preview strong {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--green);
+}
+
+.quick-allocate-status .is-negative {
+  color: var(--red);
+}
+
 label.field.compact {
   gap: 5px;
 }

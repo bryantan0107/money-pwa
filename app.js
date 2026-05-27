@@ -112,6 +112,9 @@ const I18N = {
     targetAmount: "Target Amount",
     from: "From",
     to: "To",
+    before: "Before",
+    after: "After",
+    unallocatedAfter: "Unallocated after",
     quickAdd: "Quick Add",
     filter: "Filter",
     noFunds: "No categories yet.",
@@ -152,6 +155,7 @@ const I18N = {
     backupRecent: days => `Last backup was ${days} days ago. Save a backup file to iCloud Drive for peace of mind.`,
     backupNever: "No backup yet. Export one and save it to iCloud Drive.",
     validAmount: "Please enter a valid amount.",
+    validQuickAllocate: "Enter an amount within your unallocated income.",
     validQuickAdd: "Enter a valid quick add amount.",
     validAllocations: "Please enter valid allocation amounts.",
     validTransfer: "Choose two different categories and enter a valid amount.",
@@ -262,6 +266,9 @@ const I18N = {
     targetAmount: "目标金额",
     from: "从",
     to: "到",
+    before: "分配前",
+    after: "分配后",
+    unallocatedAfter: "分配后未分配",
     quickAdd: "快速添加",
     filter: "筛选",
     noFunds: "还没有分类。",
@@ -302,6 +309,7 @@ const I18N = {
     backupRecent: days => `上次备份是 ${days} 天前。建议导出备份并保存到 iCloud Drive。`,
     backupNever: "还没有备份。建议导出一次并保存到 iCloud Drive。",
     validAmount: "请输入有效金额。",
+    validQuickAllocate: "请输入不超过未分配收入的金额。",
     validQuickAdd: "请输入有效的快速添加金额。",
     validAllocations: "请输入有效的分配金额。",
     validTransfer: "请选择两个不同的分类并输入有效金额。",
@@ -464,6 +472,7 @@ const els = {
   allocationDetailIncome: document.querySelector("#allocationDetailIncome"),
   allocationDetailAllocated: document.querySelector("#allocationDetailAllocated"),
   allocationDetailUnallocated: document.querySelector("#allocationDetailUnallocated"),
+  allocationDetailQuickAllocateBtn: document.querySelector("#allocationDetailQuickAllocateBtn"),
   allocationDetailTable: document.querySelector("#allocationDetailTable"),
   allocationDetailEditActions: document.querySelector("#allocationDetailEditActions"),
   allocationDetailSaveBtn: document.querySelector("#allocationDetailSaveBtn"),
@@ -533,6 +542,7 @@ els.allocationDetailAddIncomeBtn.addEventListener("click", event => {
   event.stopPropagation();
   openDialog("income");
 });
+els.allocationDetailQuickAllocateBtn.addEventListener("click", () => openDialog("quickAllocate"));
 els.addRecordBtn.addEventListener("click", toggleAddRecordMenu);
 els.addRecordIncomeBtn.addEventListener("click", () => {
   closeAddRecordMenu();
@@ -641,6 +651,8 @@ els.fundSearchInput.addEventListener("focus", renderFundSearchResults);
 els.form.addEventListener("submit", saveEntry);
 els.form.addEventListener("input", updateAllocationEditor);
 els.form.addEventListener("change", updateAllocationEditor);
+els.form.addEventListener("input", updateQuickAllocatePreview);
+els.form.addEventListener("change", updateQuickAllocatePreview);
 els.form.addEventListener("input", updateNoteAutocomplete);
 els.form.addEventListener("click", applyNoteSuggestion);
 els.form.addEventListener("keydown", event => {
@@ -1068,6 +1080,7 @@ function renderStaticLanguage() {
   document.querySelector("#allocationDetailView .detail-stats .metric.allocated span").textContent = t("allocated");
   document.querySelector("#allocationDetailView .detail-stats .metric.left span").textContent = t("unallocated");
   document.querySelector("#allocationDetailView .expense-panel h2").textContent = t("fundAllocation");
+  els.allocationDetailQuickAllocateBtn.textContent = t("allocate");
   els.allocationDetailSaveBtn.textContent = t("save");
   els.allocationDetailCancelBtn.textContent = t("cancel");
   document.querySelector(".allocation-detail-table th:nth-child(1)").textContent = t("fundAllocation");
@@ -1992,6 +2005,7 @@ function openDialog(mode, id = null, defaults = {}) {
     project: state.projects,
     projectEntry: selectedProject()?.entries || [],
     allocation: month.funds,
+    quickAllocate: month.funds,
     transfer: month.funds
   }[mode];
   const item = id ? source.find(entry => entry.id === id) : defaults;
@@ -2003,6 +2017,7 @@ function openDialog(mode, id = null, defaults = {}) {
     project: id ? t("editProject") : t("addProject"),
     projectEntry: id ? t("editProjectEntry") : t("addProjectEntry"),
     allocation: t("allocateIncome"),
+    quickAllocate: t("allocateIncome"),
     transfer: t("moveFunds")
   };
   els.dialogTitle.textContent = titles[mode];
@@ -2072,6 +2087,10 @@ function fieldTemplates(mode, item) {
 
   if (mode === "allocation") {
     return renderAllocationEditor();
+  }
+
+  if (mode === "quickAllocate") {
+    return renderQuickAllocateForm();
   }
 
   if (mode === "transfer") {
@@ -2164,6 +2183,44 @@ function renderAllocationEditor() {
         </tbody>
       </table>
     </div>
+  `;
+}
+
+function renderQuickAllocateForm() {
+  const month = currentMonth();
+  const funds = month.funds;
+  const selected = funds[0];
+  const unallocated = unallocatedFor(month);
+  const before = selected ? balanceFor(selected) : 0;
+  const options = funds
+    .map(fund => `<option value="${fund.id}">${escapeHtml(fund.name)} · ${money(balanceFor(fund))}</option>`)
+    .join("");
+
+  return `
+    <section class="quick-allocate-status">
+      <article>
+        <span>${t("unallocated")}</span>
+        <strong data-quick-unallocated>${money(unallocated)}</strong>
+      </article>
+      <article>
+        <span>${t("unallocatedAfter")}</span>
+        <strong data-quick-unallocated-after>${money(unallocated)}</strong>
+      </article>
+    </section>
+    <label class="field">${t("category")}
+      <select name="fundId" data-quick-allocate-fund>${options}</select>
+    </label>
+    ${field(t("amount"), "amount", "", "number")}
+    <section class="quick-allocate-preview">
+      <article>
+        <span>${t("before")}</span>
+        <strong data-quick-before>${money(before)}</strong>
+      </article>
+      <article>
+        <span>${t("after")}</span>
+        <strong data-quick-after>${money(before)}</strong>
+      </article>
+    </section>
   `;
 }
 
@@ -2310,6 +2367,11 @@ function saveEntry(event) {
 
   if (dialogMode === "allocation") {
     saveAllocationEditor(data);
+    return;
+  }
+
+  if (dialogMode === "quickAllocate") {
+    saveQuickAllocate(data);
     return;
   }
 
@@ -2548,6 +2610,31 @@ function refreshAllocationEditorSummary() {
   }
 }
 
+function updateQuickAllocatePreview() {
+  if (dialogMode !== "quickAllocate") return;
+  const month = currentMonth();
+  const data = Object.fromEntries(new FormData(els.form).entries());
+  const fund = month.funds.find(item => item.id === data.fundId) || month.funds[0];
+  const amount = parseMoneyInput(data.amount) || 0;
+  const unallocated = unallocatedFor(month);
+  const before = fund ? balanceFor(fund) : 0;
+  const after = before + amount;
+  const unallocatedAfter = unallocated - amount;
+
+  const unallocatedEl = els.form.querySelector("[data-quick-unallocated]");
+  const unallocatedAfterEl = els.form.querySelector("[data-quick-unallocated-after]");
+  const beforeEl = els.form.querySelector("[data-quick-before]");
+  const afterEl = els.form.querySelector("[data-quick-after]");
+
+  if (unallocatedEl) unallocatedEl.textContent = money(unallocated);
+  if (unallocatedAfterEl) {
+    unallocatedAfterEl.textContent = money(unallocatedAfter);
+    unallocatedAfterEl.classList.toggle("is-negative", unallocatedAfter < 0);
+  }
+  if (beforeEl) beforeEl.textContent = money(before);
+  if (afterEl) afterEl.textContent = money(after);
+}
+
 function allocationEditorTotal() {
   return [...els.form.querySelectorAll("[data-allocation-input]")]
     .reduce((total, input) => total + (parseMoneyInput(input.value) || 0), 0);
@@ -2586,6 +2673,21 @@ function saveAllocationEditor() {
       item.fund.updatedAt = nowStamp();
     }
   });
+  finishBalanceMutation();
+}
+
+function saveQuickAllocate(data) {
+  const amount = parseMoneyInput(data.amount);
+  const fund = currentMonth().funds.find(item => item.id === data.fundId);
+  const unallocated = unallocatedFor();
+
+  if (!fund || amount === null || amount <= 0 || amount > unallocated) {
+    alert(t("validQuickAllocate"));
+    return;
+  }
+
+  fund.allocation = Number(fund.allocation || 0) + amount;
+  fund.updatedAt = nowStamp();
   finishBalanceMutation();
 }
 
