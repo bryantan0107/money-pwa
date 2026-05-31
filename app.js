@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.05.31";
+const APP_VERSION = "2026.05.31.1";
 const I18N = {
   en: {
     appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
