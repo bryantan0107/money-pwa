@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.05.31.1";
+const APP_VERSION = "2026.05.31.2";
 const I18N = {
   en: {
     appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
@@ -1010,7 +1010,7 @@ function selectedProject() {
 
 function money(value) {
   if (state.privacyMode) return "••••";
-  const formatted = Number(value || 0).toLocaleString("en-US", {
+  const formatted = normalizeMoney(value).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -1018,9 +1018,21 @@ function money(value) {
 }
 
 function signedMoney(value) {
-  const amount = Number(value || 0);
+  const amount = normalizeMoney(value);
   if (state.privacyMode) return "••••";
   return amount < 0 ? `-${money(Math.abs(amount))}` : money(amount);
+}
+
+function moneyCents(value) {
+  return Math.round(Number(value || 0) * 100);
+}
+
+function centsToMoney(cents) {
+  return cents / 100;
+}
+
+function normalizeMoney(value) {
+  return centsToMoney(moneyCents(value));
 }
 
 function formatShortDate(value) {
@@ -1052,7 +1064,7 @@ function sum(items, key = "amount") {
 }
 
 function unallocatedFor(month = currentMonth()) {
-  return sum(month.incomes) - sum(month.funds, "allocation");
+  return normalizeMoney(sum(month.incomes) - sum(month.funds, "allocation"));
 }
 
 function expenseTotalFor(category, month = currentMonth()) {
@@ -1471,7 +1483,7 @@ function refreshInlineAllocationSummary() {
     return { ...fund, allocation };
   });
   const allocated = sum(previewFunds, "allocation");
-  const unallocated = totalIncome - allocated;
+  const unallocated = normalizeMoney(totalIncome - allocated);
   const percent = totalIncome > 0 ? Math.min(100, Math.max(0, (allocated / totalIncome) * 100)) : 0;
   els.allocationDetailPercent.textContent = t("allocationDetailSummary", money(allocated), money(totalIncome), Math.round(percent));
   els.allocationDetailAllocated.textContent = money(allocated);
@@ -1497,7 +1509,7 @@ function allocationPreviewSegments(funds, totalIncome, limit = 5) {
     color: colors[index % colors.length]
   }));
   const otherAmount = sum(otherFunds, "allocation");
-  const unallocated = Math.max(0, totalIncome - sum(funds, "allocation"));
+  const unallocated = Math.max(0, normalizeMoney(totalIncome - sum(funds, "allocation")));
 
   if (otherAmount > 0) segments.push({ label: t("other"), amount: otherAmount, color: "#a1a1a6" });
   if (unallocated > 0) segments.push({ label: t("unallocated"), amount: unallocated, color: "#d1d1d6", muted: true });
@@ -1519,8 +1531,9 @@ function saveInlineAllocationDetail() {
 
   const totalIncome = sum(currentMonth().incomes);
   const totalAllocated = updates.reduce((total, item) => total + item.amount, 0);
-  if (totalAllocated > totalIncome) {
-    alert(t("overAllocated", money(totalAllocated - totalIncome)));
+  const overAllocatedCents = moneyCents(totalAllocated) - moneyCents(totalIncome);
+  if (overAllocatedCents > 0) {
+    alert(t("overAllocated", money(centsToMoney(overAllocatedCents))));
     return;
   }
 
@@ -1529,7 +1542,7 @@ function saveInlineAllocationDetail() {
   updates.forEach(item => {
     const previousAllocation = Number(item.fund.allocation || 0);
     if (Number(item.fund.allocation || 0) !== item.amount) {
-      item.fund.allocation = item.amount;
+      item.fund.allocation = normalizeMoney(item.amount);
       item.fund.updatedAt = nowStamp();
       addCategoryEvent({
         type: "allocation-adjustment",
@@ -3095,7 +3108,7 @@ function applyQuickAllocationToEditor() {
 function refreshAllocationEditorSummary() {
   const totalIncome = sum(currentMonth().incomes);
   const allocated = allocationEditorTotal();
-  const unallocated = totalIncome - allocated;
+  const unallocated = normalizeMoney(totalIncome - allocated);
   const allocatedEl = els.form.querySelector("#allocationEditorAllocated");
   const unallocatedEl = els.form.querySelector("#allocationEditorUnallocated");
 
@@ -3115,7 +3128,7 @@ function updateQuickAllocatePreview() {
   const unallocated = unallocatedFor(month);
   const before = fund ? balanceFor(fund) : 0;
   const after = before + amount;
-  const unallocatedAfter = unallocated - amount;
+  const unallocatedAfter = normalizeMoney(unallocated - amount);
 
   const unallocatedEl = els.form.querySelector("[data-quick-unallocated]");
   const unallocatedAfterEl = els.form.querySelector("[data-quick-unallocated-after]");
@@ -3151,8 +3164,9 @@ function saveAllocationEditor() {
 
   const totalIncome = sum(currentMonth().incomes);
   const totalAllocated = updates.reduce((total, item) => total + item.amount, 0);
-  if (totalAllocated > totalIncome) {
-    alert(t("overAllocated", money(totalAllocated - totalIncome)));
+  const overAllocatedCents = moneyCents(totalAllocated) - moneyCents(totalIncome);
+  if (overAllocatedCents > 0) {
+    alert(t("overAllocated", money(centsToMoney(overAllocatedCents))));
     return;
   }
 
@@ -3166,7 +3180,7 @@ function saveAllocationEditor() {
   updates.forEach(item => {
     const previousAllocation = Number(item.fund.allocation || 0);
     if (Number(item.fund.allocation || 0) !== item.amount) {
-      item.fund.allocation = item.amount;
+      item.fund.allocation = normalizeMoney(item.amount);
       item.fund.updatedAt = nowStamp();
       addCategoryEvent({
         type: "allocation-adjustment",
@@ -3184,12 +3198,12 @@ function saveQuickAllocate(data) {
   const fund = currentMonth().funds.find(item => item.id === data.fundId);
   const unallocated = unallocatedFor();
 
-  if (!fund || amount === null || amount <= 0 || amount > unallocated) {
+  if (!fund || amount === null || moneyCents(amount) <= 0 || moneyCents(amount) > moneyCents(unallocated)) {
     alert(t("validQuickAllocate"));
     return;
   }
 
-  fund.allocation = Number(fund.allocation || 0) + amount;
+  fund.allocation = normalizeMoney(Number(fund.allocation || 0) + amount);
   fund.updatedAt = nowStamp();
   addCategoryEvent({
     type: "allocation-adjustment",
