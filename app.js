@@ -6,7 +6,8 @@ const DEFAULT_FUND_SORT = "available-desc";
 const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
-const APP_VERSION = "2026.05.23";
+const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
+const APP_VERSION = "2026.05.31";
 const I18N = {
   en: {
     appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
@@ -395,6 +396,7 @@ const ENGLISH_STATUS_MAP = {
 const initialData = {
   currentMonth: "2026-05",
   dataVersion: DATA_VERSION,
+  categoryLifecycleRepairVersion: CATEGORY_LIFECYCLE_REPAIR_VERSION,
   languageNormalized: true,
   language: DEFAULT_LANGUAGE,
   privacyMode: false,
@@ -816,7 +818,55 @@ function normalizeStateLanguage(rawState) {
       debt.status = translateStatus(debt.status);
     });
   });
+  repairCategoryLifecycleGaps(rawState);
   return rawState;
+}
+
+function repairCategoryLifecycleGaps(rawState) {
+  if (rawState.categoryLifecycleRepairVersion >= CATEGORY_LIFECYCLE_REPAIR_VERSION) return;
+
+  const keys = Object.keys(rawState.months || {}).sort();
+  let changed = false;
+
+  keys.forEach((monthId, index) => {
+    if (index === 0) return;
+    const previous = rawState.months[keys[index - 1]];
+    const month = rawState.months[monthId];
+    if (!previous?.funds || !month?.funds) return;
+
+    previous.funds.forEach(previousFund => {
+      const existing = month.funds.find(fund => fund.name === previousFund.name);
+      if (existing) {
+        existing.start = balanceForMonthFund(previousFund, previous);
+        return;
+      }
+
+      month.funds.push({
+        id: crypto.randomUUID(),
+        name: previousFund.name,
+        start: balanceForMonthFund(previousFund, previous),
+        allocation: 0,
+        target: Number(previousFund.target || 0),
+        pinned: Boolean(previousFund.pinned),
+        createdAt: fallbackTimestamp(`${monthId}-01`),
+        updatedAt: ""
+      });
+      changed = true;
+    });
+  });
+
+  rawState.categoryLifecycleRepairVersion = CATEGORY_LIFECYCLE_REPAIR_VERSION;
+  if (changed) rawState.backupDirty = true;
+}
+
+function balanceForMonthFund(fund, month) {
+  return Number(fund.start || 0) + Number(fund.allocation || 0) - expenseTotalForMonthCategory(fund.name, month);
+}
+
+function expenseTotalForMonthCategory(category, month) {
+  return (month.expenses || [])
+    .filter(expense => expense.category === category)
+    .reduce((total, expense) => total + Number(expense.amount || 0), 0);
 }
 
 function translateName(value) {
