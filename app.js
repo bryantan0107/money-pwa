@@ -3,6 +3,7 @@ const LAST_BACKUP_KEY = "monthly-money-manager-last-backup";
 const DISMISSED_BACKUP_KEY = "monthly-money-manager-backup-dismissed";
 const BACKUP_REMINDER_DAYS = 7;
 const DEFAULT_FUND_SORT = "available-desc";
+const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const APP_VERSION = "2026.05.23";
@@ -35,6 +36,7 @@ const I18N = {
     leastAvailable: "Least available",
     recentlyUpdated: "Recently updated",
     oldestUpdated: "Oldest updated",
+    manualOrder: "Manual order",
     records: "Records",
     projects: "Projects",
     project: "Project",
@@ -69,9 +71,20 @@ const I18N = {
     expenseFunds: "Expense Categories",
     income: "Income",
     expenses: "Expenses",
+    expense: "Expense",
+    allocation: "Allocation",
+    moveIn: "Move In",
+    moveOut: "Move Out",
+    projectSettlement: "Project Settlement",
+    startingBalanceRecord: "Starting Balance",
     settings: "Settings",
     backup: "Backup",
     backupText: "Save a JSON backup file to iCloud Drive.",
+    backupStatus: "Backup Status",
+    backupStatusClean: "All financial changes are backed up.",
+    backupStatusDirty: "Financial changes need a new backup.",
+    lastBackup: "Last backup",
+    neverBackedUp: "Never backed up",
     restore: "Restore",
     restoreText: "Import a backup file from this app.",
     currency: "Currency",
@@ -107,6 +120,7 @@ const I18N = {
     percentIncome: "% Income",
     cancel: "Cancel",
     save: "Save",
+    delete: "Delete",
     edit: "Edit",
     name: "Name",
     targetAmount: "Target Amount",
@@ -119,7 +133,7 @@ const I18N = {
     filter: "Filter",
     noFunds: "No categories yet.",
     noMatchingRecords: "No matching records.",
-    noExpensesInFund: "No expenses in this category yet.",
+    noExpensesInFund: "No records in this category yet.",
     noMatchingFund: "No matching category found.",
     noFundAccounts: "No categories yet.",
     depleted: "Depleted",
@@ -137,10 +151,15 @@ const I18N = {
     deleteExpenseConfirm: "Delete this expense? Balances will update immediately.",
     deleteSettledProjectExpenseConfirm: "This expense was created by a project settlement. Delete it anyway? It will be removed from that settlement link.",
     allocateIncome: "Allocate Income",
+    deleteCategoryConfirm: name => `Delete ${name} from this month onward? The category card will be removed from this month and later months, but historical records before this month will stay unchanged.`,
+    deleteCategoryWithActivityConfirm: name => `Delete ${name} from this month onward? This category has current or future activity. The category card will be removed from this month and later months, but historical Records and earlier months will not be cleared.`,
     deleteProject: "Delete",
     deleteProjectConfirm: name => `Delete ${name}? This removes the project and its entries.`,
     deleteSettledProjectConfirm: name => `Delete ${name}? This also removes the expense records created when this project was settled.`,
     moveFunds: "Move Between Categories",
+    allocationChanged: "Allocation changed",
+    toCategoryNote: category => `To ${category}`,
+    fromCategoryNote: category => `From ${category}`,
     greyMonths: "Grey months have not been created yet. The small line marks the real current month.",
     openMonthCalendar: "Open month calendar",
     previousYear: "Previous year",
@@ -189,6 +208,7 @@ const I18N = {
     leastAvailable: "可用最少",
     recentlyUpdated: "最近更新",
     oldestUpdated: "最早更新",
+    manualOrder: "手动排序",
     records: "记录",
     projects: "项目",
     project: "项目",
@@ -223,9 +243,20 @@ const I18N = {
     expenseFunds: "支出分类",
     income: "收入",
     expenses: "支出",
+    expense: "支出",
+    allocation: "分配",
+    moveIn: "转入",
+    moveOut: "转出",
+    projectSettlement: "项目结算",
+    startingBalanceRecord: "起始余额",
     settings: "设置",
     backup: "备份",
     backupText: "导出 JSON 备份文件到 iCloud Drive。",
+    backupStatus: "备份状态",
+    backupStatusClean: "财务修改已经备份。",
+    backupStatusDirty: "有财务修改需要重新备份。",
+    lastBackup: "最近备份",
+    neverBackedUp: "还没有备份",
     restore: "恢复",
     restoreText: "从这个 app 导入备份文件。",
     currency: "货币",
@@ -261,6 +292,7 @@ const I18N = {
     percentIncome: "% 收入",
     cancel: "取消",
     save: "保存",
+    delete: "删除",
     edit: "编辑",
     name: "名称",
     targetAmount: "目标金额",
@@ -273,7 +305,7 @@ const I18N = {
     filter: "筛选",
     noFunds: "还没有分类。",
     noMatchingRecords: "没有匹配记录。",
-    noExpensesInFund: "这个分类还没有支出。",
+    noExpensesInFund: "这个分类还没有记录。",
     noMatchingFund: "没有匹配分类。",
     noFundAccounts: "还没有分类。",
     depleted: "已用完",
@@ -291,10 +323,15 @@ const I18N = {
     deleteExpenseConfirm: "删除这笔支出？余额会立即更新。",
     deleteSettledProjectExpenseConfirm: "这笔支出来自项目结算。仍然删除吗？它会从该项目结算记录中移除。",
     allocateIncome: "分配收入",
+    deleteCategoryConfirm: name => `从本月开始删除 ${name}？这个分类卡片会从本月和后续月份移除，但本月之前的历史记录会保留。`,
+    deleteCategoryWithActivityConfirm: name => `从本月开始删除 ${name}？这个分类在当前或后续月份有记录。分类卡片会从本月和后续月份移除，但历史记录和之前月份不会被清空。`,
     deleteProject: "删除",
     deleteProjectConfirm: name => `删除 ${name}？这会删除项目和里面的明细。`,
     deleteSettledProjectConfirm: name => `删除 ${name}？这也会删除项目结算时生成的正式支出记录。`,
     moveFunds: "分类间移动",
+    allocationChanged: "分配调整",
+    toCategoryNote: category => `到 ${category}`,
+    fromCategoryNote: category => `从 ${category}`,
     greyMonths: "灰色月份还没有创建。细线标记现实中的当前月份。",
     openMonthCalendar: "打开月份日历",
     previousYear: "上一年",
@@ -362,6 +399,9 @@ const initialData = {
   language: DEFAULT_LANGUAGE,
   privacyMode: false,
   fundSort: DEFAULT_FUND_SORT,
+  fundOrder: [],
+  backupDirty: false,
+  lastBackupAt: null,
   projects: [],
   months: {
     "2026-05": {
@@ -416,6 +456,7 @@ const initialData = {
         { id: crypto.randomUUID(), date: "2026-05-16", category: "Dining Out", note: "Dining out", amount: 37 },
         { id: crypto.randomUUID(), date: "2026-05-16", category: "Dining Out", note: "Dining out", amount: 11 }
       ],
+      categoryEvents: [],
       debts: [
         { id: crypto.randomUUID(), person: "Mom", note: "Owes me", amount: 454.44, status: "Unpaid" },
         { id: crypto.randomUUID(), person: "Ayu", note: "Goyard bag", amount: 960, status: "Unpaid" }
@@ -442,6 +483,9 @@ let monthCalendarYear = Number(state.currentMonth.slice(0, 4));
 let toastTimer = null;
 let updateRegistration = null;
 let refreshingForUpdate = false;
+let draggedFundName = null;
+let touchFundDrag = null;
+let suppressFundClick = false;
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -523,6 +567,9 @@ const els = {
   checkUpdatesBtn: document.querySelector("#checkUpdatesBtn"),
   settingsBackupBtn: document.querySelector("#settingsBackupBtn"),
   settingsImportInput: document.querySelector("#settingsImportInput"),
+  backupStatusTitle: document.querySelector("#backupStatusTitle"),
+  backupStatusText: document.querySelector("#backupStatusText"),
+  backupStatusValue: document.querySelector("#backupStatusValue"),
   dialogTitle: document.querySelector("#dialogTitle"),
   form: document.querySelector("#entryForm"),
   deleteDialogBtn: document.querySelector("#deleteDialogBtn"),
@@ -648,6 +695,14 @@ els.fundSearchInput.addEventListener("input", () => {
   renderFundSearchResults();
 });
 els.fundSearchInput.addEventListener("focus", renderFundSearchResults);
+els.fundList.addEventListener("dragstart", startFundDrag);
+els.fundList.addEventListener("dragover", moveFundDrag);
+els.fundList.addEventListener("drop", dropFundDrag);
+els.fundList.addEventListener("dragend", endFundDrag);
+els.fundList.addEventListener("pointerdown", startTouchFundDrag);
+els.fundList.addEventListener("pointermove", moveTouchFundDrag);
+els.fundList.addEventListener("pointerup", finishTouchFundDrag);
+els.fundList.addEventListener("pointercancel", cancelTouchFundDrag);
 els.form.addEventListener("submit", saveEntry);
 els.form.addEventListener("input", updateAllocationEditor);
 els.form.addEventListener("change", updateAllocationEditor);
@@ -682,6 +737,7 @@ function loadState() {
     const parsed = JSON.parse(saved);
     if (!parsed.months || !parsed.currentMonth) return normalizeStateLanguage(structuredClone(initialData));
     if (!parsed.fundSort) parsed.fundSort = DEFAULT_FUND_SORT;
+    if (!Array.isArray(parsed.fundOrder)) parsed.fundOrder = [];
     if (!parsed.language) parsed.language = DEFAULT_LANGUAGE;
     if (!Array.isArray(parsed.projects)) parsed.projects = [];
     parsed.privacyMode = Boolean(parsed.privacyMode);
@@ -698,7 +754,10 @@ function loadState() {
 function normalizeStateLanguage(rawState) {
   const shouldTranslateLegacyNames = rawState.languageNormalized !== true;
   if (!rawState.fundSort) rawState.fundSort = DEFAULT_FUND_SORT;
+  if (!Array.isArray(rawState.fundOrder)) rawState.fundOrder = [];
   if (!rawState.language) rawState.language = DEFAULT_LANGUAGE;
+  rawState.backupDirty = Boolean(rawState.backupDirty);
+  rawState.lastBackupAt = rawState.lastBackupAt || localStorage.getItem(LAST_BACKUP_KEY) || null;
   if (!Array.isArray(rawState.projects)) rawState.projects = [];
   rawState.dataVersion = DATA_VERSION;
   rawState.languageNormalized = true;
@@ -720,6 +779,7 @@ function normalizeStateLanguage(rawState) {
     });
   });
   Object.entries(rawState.months || {}).forEach(([monthId, month]) => {
+    month.categoryEvents = Array.isArray(month.categoryEvents) ? month.categoryEvents : [];
     month.incomes?.forEach(income => {
       income.name = shouldTranslateLegacyNames ? translateName(income.name) : income.name;
       income.date = income.date || `${monthId}-01`;
@@ -737,6 +797,18 @@ function normalizeStateLanguage(rawState) {
       expense.note = translateNote(expense.note);
       expense.createdAt = expense.createdAt || fallbackTimestamp(expense.date);
       expense.updatedAt = expense.updatedAt || expense.createdAt;
+    });
+    month.categoryEvents.forEach(event => {
+      event.id = event.id || crypto.randomUUID();
+      event.date = event.date || `${monthId}-01`;
+      event.type = event.type || "adjustment";
+      event.category = shouldTranslateLegacyNames ? translateName(event.category || "") : (event.category || "");
+      event.fromCategory = shouldTranslateLegacyNames ? translateName(event.fromCategory || "") : (event.fromCategory || "");
+      event.toCategory = shouldTranslateLegacyNames ? translateName(event.toCategory || "") : (event.toCategory || "");
+      event.note = translateNote(event.note || "");
+      event.amount = Number.isFinite(Number(event.amount)) ? Number(event.amount) : 0;
+      event.createdAt = event.createdAt || fallbackTimestamp(event.date);
+      event.updatedAt = event.updatedAt || event.createdAt;
     });
     month.debts?.forEach(debt => {
       debt.person = shouldTranslateLegacyNames ? translateName(debt.person) : debt.person;
@@ -761,6 +833,10 @@ function translateStatus(value) {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function markFinancialDirty() {
+  state.backupDirty = true;
 }
 
 function t(key, ...args) {
@@ -814,6 +890,33 @@ function cascadeLaterMonthStarts(fromMonthId = state.currentMonth) {
   });
 }
 
+function syncCreatedCategoryToLaterMonths(createdFund) {
+  let previousKey = state.currentMonth;
+  laterMonthKeys().forEach(monthId => {
+    const previous = state.months[previousKey];
+    const month = state.months[monthId];
+    let fund = month.funds.find(item => item.name === createdFund.name);
+
+    if (!fund) {
+      fund = {
+        id: crypto.randomUUID(),
+        name: createdFund.name,
+        start: 0,
+        allocation: 0,
+        target: 0,
+        pinned: false,
+        createdAt: fallbackTimestamp(`${monthId}-01`),
+        updatedAt: createdFund.updatedAt || nowStamp()
+      };
+      month.funds.push(fund);
+    }
+
+    const previousFund = previous.funds.find(item => item.name === createdFund.name);
+    fund.start = previousFund ? balanceFor(previousFund, previous) : 0;
+    previousKey = monthId;
+  });
+}
+
 function cascadeLaterMonthStartsQuietly(fromMonthId = state.currentMonth) {
   const hadLaterMonths = hasLaterMonths(fromMonthId);
   cascadeLaterMonthStarts(fromMonthId);
@@ -822,6 +925,7 @@ function cascadeLaterMonthStartsQuietly(fromMonthId = state.currentMonth) {
 
 function finishBalanceMutation() {
   cascadeLaterMonthStartsQuietly();
+  markFinancialDirty();
   saveState();
   els.dialog.close();
   render();
@@ -861,6 +965,12 @@ function money(value) {
     maximumFractionDigits: 2
   });
   return `€${formatted}`;
+}
+
+function signedMoney(value) {
+  const amount = Number(value || 0);
+  if (state.privacyMode) return "••••";
+  return amount < 0 ? `-${money(Math.abs(amount))}` : money(amount);
 }
 
 function formatShortDate(value) {
@@ -905,6 +1015,39 @@ function balanceFor(fund, month = currentMonth()) {
   return Number(fund.start || 0) + Number(fund.allocation || 0) - expenseTotalFor(fund.name, month);
 }
 
+function addCategoryEvent({ date = defaultEntryDateForCurrentMonth(), type, category, amount, note = "", fromCategory = "", toCategory = "" }) {
+  const numericAmount = Number(amount || 0);
+  if (!category || !type || numericAmount === 0) return;
+
+  const month = currentMonth();
+  month.categoryEvents = Array.isArray(month.categoryEvents) ? month.categoryEvents : [];
+  const stamp = nowStamp();
+  month.categoryEvents.push({
+    id: crypto.randomUUID(),
+    date,
+    type,
+    category,
+    fromCategory,
+    toCategory,
+    note,
+    amount: numericAmount,
+    createdAt: stamp,
+    updatedAt: stamp
+  });
+}
+
+function categoryEventTypeLabel(type) {
+  const labels = {
+    "starting-balance": t("startingBalanceRecord"),
+    "allocation-adjustment": t("allocation"),
+    "move-in": t("moveIn"),
+    "move-out": t("moveOut"),
+    expense: t("expense"),
+    "project-settlement": t("projectSettlement")
+  };
+  return labels[type] || t("records");
+}
+
 function fundHealth(progress) {
   if (progress <= 0) return "empty";
   if (progress < 20) return "danger";
@@ -929,6 +1072,9 @@ function sortFundCards(cards) {
 
 function compareFundCards(a, b) {
   const sortMode = state.fundSort || DEFAULT_FUND_SORT;
+  if (sortMode === MANUAL_FUND_SORT) {
+    return manualFundRank(a.fund.name) - manualFundRank(b.fund.name) || a.fund.name.localeCompare(b.fund.name);
+  }
   if (sortMode === "available-asc") {
     return a.balance - b.balance || a.fund.name.localeCompare(b.fund.name);
   }
@@ -939,6 +1085,43 @@ function compareFundCards(a, b) {
     return a.updatedAt.localeCompare(b.updatedAt) || a.fund.name.localeCompare(b.fund.name);
   }
   return b.balance - a.balance || a.fund.name.localeCompare(b.fund.name);
+}
+
+function manualFundRank(name) {
+  const index = (state.fundOrder || []).indexOf(name);
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
+}
+
+function addCategoryToManualOrder(name) {
+  if (!name) return;
+  const order = Array.isArray(state.fundOrder) ? state.fundOrder : [];
+  if (!order.includes(name)) order.push(name);
+  state.fundOrder = order;
+}
+
+function renameCategoryInManualOrder(previousName, nextName) {
+  if (!previousName || !nextName || previousName === nextName) return;
+  const nextOrder = [];
+  (state.fundOrder || []).forEach(name => {
+    const resolvedName = name === previousName ? nextName : name;
+    if (!nextOrder.includes(resolvedName)) nextOrder.push(resolvedName);
+  });
+  if (!nextOrder.includes(nextName)) nextOrder.push(nextName);
+  state.fundOrder = nextOrder;
+}
+
+function removeCategoryFromManualOrder(name) {
+  if (!name) return;
+  state.fundOrder = (state.fundOrder || []).filter(item => item !== name);
+}
+
+function ensureFundOrderIncludesCurrentCategories() {
+  const existing = new Set(currentMonth().funds.map(fund => fund.name));
+  const ordered = (state.fundOrder || []).filter(name => existing.has(name));
+  currentMonth().funds.forEach(fund => {
+    if (!ordered.includes(fund.name)) ordered.push(fund.name);
+  });
+  state.fundOrder = ordered;
 }
 
 function allocationSegments(limit = 5) {
@@ -986,6 +1169,7 @@ function render() {
   renderDetail();
   renderDetailSortLabels();
   renderBackupReminder();
+  renderBackupStatus();
   const inDetail = Boolean(selectedFundId) || showingAllocationDetail || Boolean(selectedProjectId);
   els.dashboardView.hidden = inDetail || activeTab !== "home";
   els.recordsView.hidden = inDetail || activeTab !== "records";
@@ -1032,6 +1216,7 @@ function renderStaticLanguage() {
     sortOptions[1].textContent = t("leastAvailable");
     sortOptions[2].textContent = t("recentlyUpdated");
     sortOptions[3].textContent = t("oldestUpdated");
+    if (sortOptions[4]) sortOptions[4].textContent = t("manualOrder");
   }
   els.addFundBtn.setAttribute("aria-label", t("addFund"));
   document.querySelector("#recordsView h2").textContent = t("records");
@@ -1050,12 +1235,13 @@ function renderStaticLanguage() {
   document.querySelector("#settingsView h2").textContent = t("settings");
   document.querySelector("#settingsBackupBtn").textContent = t("backupNow");
   document.querySelector(".restore-action").childNodes[0].textContent = t("restore");
-  document.querySelector(".settings-item:nth-child(1) strong").textContent = t("backup");
-  document.querySelector(".settings-item:nth-child(1) p").textContent = t("backupText");
-  document.querySelector(".settings-item:nth-child(2) strong").textContent = t("restore");
-  document.querySelector(".settings-item:nth-child(2) p").textContent = t("restoreText");
-  document.querySelector(".settings-item:nth-child(3) strong").textContent = t("currency");
-  document.querySelector(".settings-item:nth-child(3) p").textContent = t("currencyText");
+  document.querySelector("#backupSettingTitle").textContent = t("backup");
+  document.querySelector("#backupSettingText").textContent = t("backupText");
+  els.backupStatusTitle.textContent = t("backupStatus");
+  document.querySelector(".settings-item:nth-child(3) strong").textContent = t("restore");
+  document.querySelector(".settings-item:nth-child(3) p").textContent = t("restoreText");
+  document.querySelector(".settings-item:nth-child(4) strong").textContent = t("currency");
+  document.querySelector(".settings-item:nth-child(4) p").textContent = t("currencyText");
   document.querySelector("#languageSettingTitle").textContent = t("language");
   document.querySelector("#languageSettingText").textContent = t("languageText");
   document.querySelector("#updatesSettingTitle").textContent = t("updates");
@@ -1089,11 +1275,12 @@ function renderStaticLanguage() {
   document.querySelector("#detailView .detail-stats .metric:nth-child(1) span").textContent = t("startingBalance");
   document.querySelector("#detailView .detail-stats .metric:nth-child(2) span").textContent = t("monthlyAllocation");
   document.querySelector("#detailView .detail-stats .metric:nth-child(3) span").textContent = t("spentInFund");
-  document.querySelector("#detailView .expense-panel h2").textContent = t("expenses");
+  document.querySelector("#detailView .expense-panel h2").textContent = t("records");
   document.querySelector("#detailMoveBtn").textContent = t("move");
   document.querySelector("#detailAddExpenseBtn").textContent = t("logExpense");
   document.querySelector("[data-field='date'] span:first-child").textContent = t("date");
-  document.querySelector(".detail-expense-table th:nth-child(2)").textContent = t("note");
+  document.querySelector(".detail-expense-table th:nth-child(2)").textContent = t("type");
+  document.querySelector(".detail-expense-table th:nth-child(3)").textContent = t("note");
   document.querySelector("[data-field='amount'] span:first-child").textContent = t("amount");
   document.querySelector("#cancelDialogBtn").textContent = t("cancel");
   document.querySelector("#entryForm menu button[type='submit']").textContent = t("save");
@@ -1290,13 +1477,21 @@ function saveInlineAllocationDetail() {
   const changed = updates.some(item => Number(item.fund.allocation || 0) !== item.amount);
 
   updates.forEach(item => {
+    const previousAllocation = Number(item.fund.allocation || 0);
     if (Number(item.fund.allocation || 0) !== item.amount) {
       item.fund.allocation = item.amount;
       item.fund.updatedAt = nowStamp();
+      addCategoryEvent({
+        type: "allocation-adjustment",
+        category: item.fund.name,
+        amount: item.amount - previousAllocation,
+        note: t("allocationChanged")
+      });
     }
   });
   if (changed) {
     cascadeLaterMonthStartsQuietly();
+    markFinancialDirty();
     saveState();
   }
   allocationDetailEditing = false;
@@ -1305,6 +1500,7 @@ function saveInlineAllocationDetail() {
 
 function renderFunds() {
   const month = currentMonth();
+  ensureFundOrderIncludesCurrentCategories();
   const query = els.fundSearchInput.value.trim().toLowerCase();
   const funds = query
     ? month.funds.filter(fund => fund.name.toLowerCase().includes(query))
@@ -1334,7 +1530,7 @@ function renderFunds() {
 
   function renderFundCard({ fund, spent, balance, progress, health, isDepleted }) {
       return `
-        <article class="fund-card health-${health} ${isDepleted ? "is-depleted" : ""} ${fund.pinned ? "is-pinned" : ""}" data-id="${fund.id}" data-action="view-fund">
+        <article class="fund-card health-${health} ${isDepleted ? "is-depleted" : ""} ${fund.pinned ? "is-pinned" : ""}" data-id="${fund.id}" data-fund-name="${escapeAttr(fund.name)}" data-action="view-fund" draggable="true">
           <div class="fund-head">
             <span class="name">${escapeHtml(fund.name)}</span>
             <button type="button" class="pin-btn" data-action="toggle-fund-pin" data-id="${fund.id}" aria-pressed="${fund.pinned ? "true" : "false"}" aria-label="${fund.pinned ? t("unpin") : t("pin")} ${escapeAttr(fund.name)}">${fund.pinned ? "★" : "☆"}</button>
@@ -1391,6 +1587,116 @@ function renderFundSearchResults() {
     : `<div class="search-empty">${t("noMatchingFund")}</div>`;
 }
 
+function startFundDrag(event) {
+  const card = event.target.closest(".fund-card");
+  if (!card) return;
+  draggedFundName = card.dataset.fundName;
+  card.classList.add("is-dragging");
+  els.fundList.classList.add("is-reordering");
+  document.body.classList.add("is-fund-dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", draggedFundName);
+}
+
+function moveFundDrag(event) {
+  if (!draggedFundName) return;
+  const target = event.target.closest(".fund-card");
+  if (!target || target.dataset.fundName === draggedFundName) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+}
+
+function dropFundDrag(event) {
+  const target = event.target.closest(".fund-card");
+  if (!target || !draggedFundName || target.dataset.fundName === draggedFundName) return;
+  event.preventDefault();
+  reorderFundWithinDisplayGroup(draggedFundName, target.dataset.fundName);
+}
+
+function endFundDrag() {
+  draggedFundName = null;
+  els.fundList.classList.remove("is-reordering");
+  document.body.classList.remove("is-fund-dragging");
+  els.fundList.querySelectorAll(".is-dragging").forEach(card => card.classList.remove("is-dragging"));
+}
+
+function reorderFundWithinDisplayGroup(sourceName, targetName) {
+  const sourceFund = currentMonth().funds.find(fund => fund.name === sourceName);
+  const targetFund = currentMonth().funds.find(fund => fund.name === targetName);
+  if (!sourceFund || !targetFund || fundDisplayGroup(sourceFund) !== fundDisplayGroup(targetFund)) return;
+
+  ensureFundOrderIncludesCurrentCategories();
+  const order = [...state.fundOrder];
+  const sourceIndex = order.indexOf(sourceName);
+  const targetIndex = order.indexOf(targetName);
+  if (sourceIndex < 0 || targetIndex < 0) return;
+
+  order.splice(sourceIndex, 1);
+  order.splice(targetIndex, 0, sourceName);
+  state.fundOrder = order;
+  state.fundSort = MANUAL_FUND_SORT;
+  saveState();
+  renderFunds();
+}
+
+function startTouchFundDrag(event) {
+  if (event.pointerType === "mouse") return;
+  const card = event.target.closest(".fund-card");
+  if (!card || event.target.closest("button")) return;
+  touchFundDrag = {
+    sourceName: card.dataset.fundName,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    active: false
+  };
+  card.setPointerCapture?.(event.pointerId);
+}
+
+function moveTouchFundDrag(event) {
+  if (!touchFundDrag || event.pointerId !== touchFundDrag.pointerId) return;
+  const distance = Math.hypot(event.clientX - touchFundDrag.startX, event.clientY - touchFundDrag.startY);
+  if (!touchFundDrag.active && distance < 12) return;
+
+  touchFundDrag.active = true;
+  draggedFundName = touchFundDrag.sourceName;
+  els.fundList.classList.add("is-reordering");
+  document.body.classList.add("is-fund-dragging");
+  const sourceCard = els.fundList.querySelector(`[data-fund-name="${cssEscape(touchFundDrag.sourceName)}"]`);
+  sourceCard?.classList.add("is-dragging");
+  event.preventDefault();
+}
+
+function finishTouchFundDrag(event) {
+  if (!touchFundDrag || event.pointerId !== touchFundDrag.pointerId) return;
+  if (touchFundDrag.active) {
+    suppressFundClick = true;
+    window.setTimeout(() => {
+      suppressFundClick = false;
+    }, 120);
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".fund-card");
+    if (target && target.dataset.fundName !== touchFundDrag.sourceName) {
+      reorderFundWithinDisplayGroup(touchFundDrag.sourceName, target.dataset.fundName);
+    }
+    event.preventDefault();
+  }
+  cancelTouchFundDrag();
+}
+
+function cancelTouchFundDrag() {
+  touchFundDrag = null;
+  endFundDrag();
+}
+
+function cssEscape(value) {
+  return window.CSS?.escape ? CSS.escape(value) : String(value).replace(/"/g, '\\"');
+}
+
+function fundDisplayGroup(fund) {
+  if (fund.pinned) return "pinned";
+  return balanceFor(fund) <= 0 ? "depleted" : "available";
+}
+
 function renderDetail() {
   const fund = selectedFund();
   if (!fund) {
@@ -1399,36 +1705,79 @@ function renderDetail() {
   }
 
   const spent = expenseTotalFor(fund.name);
-  const expenses = currentMonth().expenses
-    .filter(expense => expense.category === fund.name)
-    .sort(compareDetailExpenses);
+  const records = categoryRecordsFor(fund).sort(compareDetailRecords);
 
   els.detailFundName.textContent = fund.name;
   els.detailBalance.textContent = money(balanceFor(fund));
   els.detailStart.textContent = money(fund.start);
   els.detailAllocation.textContent = money(fund.allocation);
   els.detailSpent.textContent = money(spent);
-  els.detailExpenseTable.innerHTML = expenses.length
-    ? expenses.map(expense => `
-      <tr class="clickable-row" data-action="edit-expense" data-id="${expense.id}" tabindex="0" aria-label="${escapeAttr(t("editRecord", expense.category, money(expense.amount)))}">
-        <td>${escapeHtml(expense.date)}</td>
-        <td>${escapeHtml(expense.note || "-")}</td>
-        <td class="number">${money(expense.amount)}</td>
+  els.detailExpenseTable.innerHTML = records.length
+    ? records.map(record => `
+      <tr class="${record.editable ? "clickable-row" : ""}" ${record.editable ? `data-action="edit-expense" data-id="${record.id}" tabindex="0" aria-label="${escapeAttr(t("editRecord", fund.name, money(Math.abs(record.amount))))}"` : ""}>
+        <td>${escapeHtml(record.date)}</td>
+        <td>${escapeHtml(categoryEventTypeLabel(record.type))}</td>
+        <td>${escapeHtml(record.note || "-")}</td>
+        <td class="number ${record.amount < 0 ? "is-negative" : "is-positive"}">${signedMoney(record.amount)}</td>
       </tr>
     `).join("")
-    : `<tr><td colspan="3" class="empty">${t("noExpensesInFund")}</td></tr>`;
+    : `<tr><td colspan="4" class="empty">${t("noExpensesInFund")}</td></tr>`;
 }
 
-function compareDetailExpenses(a, b) {
+function categoryRecordsFor(fund) {
+  const month = currentMonth();
+  const records = [];
+
+  if (Number(fund.start || 0) !== 0) {
+    records.push({
+      id: `start:${fund.id}`,
+      date: `${state.currentMonth}-01`,
+      type: "starting-balance",
+      note: "",
+      amount: Number(fund.start || 0),
+      createdAt: fallbackTimestamp(`${state.currentMonth}-01`),
+      editable: false
+    });
+  }
+
+  (month.categoryEvents || [])
+    .filter(event => event.category === fund.name)
+    .forEach(event => {
+      records.push({
+        ...event,
+        amount: Number(event.amount || 0),
+        editable: false
+      });
+    });
+
+  month.expenses
+    .filter(expense => expense.category === fund.name)
+    .forEach(expense => {
+      records.push({
+        id: expense.id,
+        date: expense.date,
+        type: expense.projectId ? "project-settlement" : "expense",
+        note: expense.note || "",
+        amount: -Number(expense.amount || 0),
+        createdAt: expense.createdAt || fallbackTimestamp(expense.date),
+        updatedAt: expense.updatedAt || expense.createdAt || fallbackTimestamp(expense.date),
+        editable: true
+      });
+    });
+
+  return records;
+}
+
+function compareDetailRecords(a, b) {
   const direction = detailExpenseSort.direction === "asc" ? 1 : -1;
   if (detailExpenseSort.field === "amount") {
     const amountDiff = a.amount - b.amount;
     if (amountDiff !== 0) return amountDiff * direction;
-    return compareExpensesByLedgerOrder(a, b);
+    return compareRecordTime(a, b);
   }
   const dateDiff = a.date.localeCompare(b.date);
   if (dateDiff !== 0) return dateDiff * direction;
-  return compareRecordTime(a, b) * direction;
+  return recordTimeKey(a).localeCompare(recordTimeKey(b)) * direction;
 }
 
 function toggleDetailExpenseSort(field) {
@@ -1765,6 +2114,7 @@ document.body.addEventListener("click", event => {
     renderRecords();
   }
   if (action === "view-fund") {
+    if (suppressFundClick) return;
     enterDetailFromCurrentTab();
     selectedFundId = id;
     showingAllocationDetail = false;
@@ -2022,9 +2372,9 @@ function openDialog(mode, id = null, defaults = {}) {
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
-  const canDelete = ["expense", "project"].includes(mode) && Boolean(id);
+  const canDelete = ["expense", "project", "fund"].includes(mode) && Boolean(id);
   els.deleteDialogBtn.hidden = !canDelete;
-  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : t("deleteExpense");
+  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : mode === "fund" ? t("delete") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
   if (!els.dialog.open) {
     lockBackgroundScroll();
@@ -2044,7 +2394,7 @@ function preventDialogInputFocus() {
 function fieldTemplates(mode, item) {
   if (mode === "income") {
     return `
-      ${field(t("date"), "date", item.date || state.currentMonth + "-01", "date")}
+      ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
       ${field(t("name"), "name", item.name || "", "text")}
       ${field(t("amount"), "amount", item.amount || "", "number")}
     `;
@@ -2440,11 +2790,17 @@ function saveEntry(event) {
       markFundUpdatedByName(payload.category);
     }
     month[key].push(created);
+    if (dialogMode === "fund") {
+      addCategoryToManualOrder(created.name);
+      syncCreatedCategoryToLaterMonths(created);
+      affectsLaterMonthStarts = true;
+    }
   }
 
   if (affectsLaterMonthStarts) {
     cascadeLaterMonthStartsQuietly();
   }
+  markFinancialDirty();
   saveState();
   els.dialog.close();
   render();
@@ -2452,6 +2808,7 @@ function saveEntry(event) {
 
 function renameCategoryRecords(previousName, nextName) {
   if (!previousName || !nextName || previousName === nextName) return;
+  renameCategoryInManualOrder(previousName, nextName);
 
   sortedMonthKeys()
     .filter(key => key >= state.currentMonth)
@@ -2469,7 +2826,32 @@ function renameCategoryRecords(previousName, nextName) {
           expense.updatedAt = nowStamp();
         }
       });
+      (month.categoryEvents || []).forEach(event => {
+        if (event.category === previousName) {
+          event.category = nextName;
+          event.updatedAt = nowStamp();
+        }
+        if (event.fromCategory === previousName) {
+          event.fromCategory = nextName;
+          event.updatedAt = nowStamp();
+        }
+        if (event.toCategory === previousName) {
+          event.toCategory = nextName;
+          event.updatedAt = nowStamp();
+        }
+      });
     });
+
+  state.projects.forEach(project => {
+    project.entries?.forEach(entry => {
+      const entryMonth = (entry.date || project.monthId || "").slice(0, 7);
+      if (entry.category === previousName && entryMonth >= state.currentMonth) {
+        entry.category = nextName;
+        entry.updatedAt = nowStamp();
+        project.updatedAt = nowStamp();
+      }
+    });
+  });
 }
 
 function deleteCurrentDialogItem() {
@@ -2479,7 +2861,69 @@ function deleteCurrentDialogItem() {
   }
   if (dialogMode === "project") {
     deleteCurrentProject();
+    return;
   }
+  if (dialogMode === "fund") {
+    deleteCurrentCategory();
+  }
+}
+
+function deleteCurrentCategory() {
+  if (dialogMode !== "fund" || !editingId) return;
+
+  const fund = currentMonth().funds.find(item => item.id === editingId);
+  if (!fund) return;
+
+  const hasActivity = categoryHasCurrentOrLaterActivity(fund.name);
+  const message = hasActivity
+    ? t("deleteCategoryWithActivityConfirm", fund.name)
+    : t("deleteCategoryConfirm", fund.name);
+  if (!window.confirm(message)) return;
+
+  removeCategoryFromCurrentAndLaterMonths(fund.name);
+  cascadeLaterMonthStartsQuietly();
+  markFinancialDirty();
+  saveState();
+  els.dialog.close();
+  render();
+}
+
+function categoryHasCurrentOrLaterActivity(categoryName) {
+  const monthHasActivity = sortedMonthKeys()
+    .filter(key => key >= state.currentMonth)
+    .some(key => {
+      const month = state.months[key];
+      const fund = month.funds.find(item => item.name === categoryName);
+      const fundHasMoney = fund && (
+        Number(fund.start || 0) !== 0 ||
+        Number(fund.allocation || 0) !== 0 ||
+        balanceFor(fund, month) !== 0
+      );
+      return fundHasMoney ||
+        month.expenses.some(expense => expense.category === categoryName) ||
+        (month.categoryEvents || []).some(event => (
+          event.category === categoryName ||
+          event.fromCategory === categoryName ||
+          event.toCategory === categoryName
+        ));
+    });
+
+  if (monthHasActivity) return true;
+
+  return state.projects.some(project => (project.entries || []).some(entry => {
+    const entryMonth = (entry.date || project.monthId || "").slice(0, 7);
+    return entry.category === categoryName && entryMonth >= state.currentMonth;
+  }));
+}
+
+function removeCategoryFromCurrentAndLaterMonths(categoryName) {
+  removeCategoryFromManualOrder(categoryName);
+  sortedMonthKeys()
+    .filter(key => key >= state.currentMonth)
+    .forEach(key => {
+      const month = state.months[key];
+      month.funds = month.funds.filter(fund => fund.name !== categoryName);
+    });
 }
 
 function deleteCurrentExpense() {
@@ -2498,6 +2942,7 @@ function deleteCurrentExpense() {
   markFundUpdatedByName(expense.category);
   unlinkSettlementExpense(expense);
   cascadeLaterMonthStartsQuietly();
+  markFinancialDirty();
   saveState();
   els.dialog.close();
   dialogMode = null;
@@ -2548,6 +2993,7 @@ function deleteProjectById(projectId, closeDialogAfterDelete) {
     cascadeLaterMonthStartsQuietly();
   }
 
+  markFinancialDirty();
   saveState();
   if (closeDialogAfterDelete) els.dialog.close();
   dialogMode = null;
@@ -2668,9 +3114,16 @@ function saveAllocationEditor() {
   }
 
   updates.forEach(item => {
+    const previousAllocation = Number(item.fund.allocation || 0);
     if (Number(item.fund.allocation || 0) !== item.amount) {
       item.fund.allocation = item.amount;
       item.fund.updatedAt = nowStamp();
+      addCategoryEvent({
+        type: "allocation-adjustment",
+        category: item.fund.name,
+        amount: item.amount - previousAllocation,
+        note: t("allocationChanged")
+      });
     }
   });
   finishBalanceMutation();
@@ -2688,6 +3141,12 @@ function saveQuickAllocate(data) {
 
   fund.allocation = Number(fund.allocation || 0) + amount;
   fund.updatedAt = nowStamp();
+  addCategoryEvent({
+    type: "allocation-adjustment",
+    category: fund.name,
+    amount,
+    note: t("allocationChanged")
+  });
   finishBalanceMutation();
 }
 
@@ -2716,6 +3175,22 @@ function transferAllocation(data) {
   toFund.start = Number(toFund.start || 0) + startMove;
   fromFund.updatedAt = nowStamp();
   toFund.updatedAt = nowStamp();
+  addCategoryEvent({
+    type: "move-out",
+    category: fromFund.name,
+    fromCategory: fromFund.name,
+    toCategory: toFund.name,
+    amount: -amount,
+    note: t("toCategoryNote", toFund.name)
+  });
+  addCategoryEvent({
+    type: "move-in",
+    category: toFund.name,
+    fromCategory: fromFund.name,
+    toCategory: toFund.name,
+    amount,
+    note: t("fromCategoryNote", fromFund.name)
+  });
   finishBalanceMutation();
 }
 
@@ -2752,6 +3227,7 @@ function saveProject(data) {
     activeTab = "projects";
   }
 
+  markFinancialDirty();
   saveState();
   els.dialog.close();
   render();
@@ -2785,6 +3261,7 @@ function saveProjectEntry(data) {
   }
 
   project.updatedAt = nowStamp();
+  markFinancialDirty();
   saveState();
   els.dialog.close();
   render();
@@ -2834,6 +3311,7 @@ function settleProject(project) {
   project.settledAt = nowStamp();
   project.updatedAt = nowStamp();
   cascadeLaterMonthStartsQuietly();
+  markFinancialDirty();
   saveState();
   render();
 }
@@ -2848,6 +3326,7 @@ function reopenProject(project) {
   project.settlementExpenseIds = [];
   project.updatedAt = nowStamp();
   cascadeLaterMonthStartsQuietly();
+  markFinancialDirty();
   saveState();
   render();
 }
@@ -2951,8 +3430,22 @@ function chooseDecimalSeparator(input, lastDot, lastComma) {
 
 function removeItem(key, id) {
   const removed = currentMonth()[key].find(item => item.id === id);
+  if (key === "funds" && removed) {
+    const hasActivity = categoryHasCurrentOrLaterActivity(removed.name);
+    const message = hasActivity
+      ? t("deleteCategoryWithActivityConfirm", removed.name)
+      : t("deleteCategoryConfirm", removed.name);
+    if (!window.confirm(message)) return;
+
+    removeCategoryFromCurrentAndLaterMonths(removed.name);
+    cascadeLaterMonthStartsQuietly();
+    markFinancialDirty();
+    saveState();
+    render();
+    return;
+  }
+
   const affectsLaterMonthStarts = Boolean((key === "expenses" || key === "funds") && removed);
-  if (key === "funds" && affectsLaterMonthStarts && !confirmLaterMonthUpdate()) return;
 
   currentMonth()[key] = currentMonth()[key].filter(item => item.id !== id);
   if (key === "expenses" && removed) {
@@ -2961,6 +3454,7 @@ function removeItem(key, id) {
   if (affectsLaterMonthStarts) {
     cascadeLaterMonthStartsQuietly();
   }
+  if (removed) markFinancialDirty();
   saveState();
   render();
 }
@@ -3049,9 +3543,11 @@ function createMonthRecord(monthId) {
       updatedAt: fund.updatedAt || ""
     })),
     expenses: [],
+    categoryEvents: [],
     debts: []
   };
   cascadeLaterMonthStarts(monthId);
+  markFinancialDirty();
   saveState();
 }
 
@@ -3079,9 +3575,13 @@ function exportData() {
   link.download = `money-backup-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
-  localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
+  state.lastBackupAt = new Date().toISOString();
+  state.backupDirty = false;
+  saveState();
+  localStorage.setItem(LAST_BACKUP_KEY, state.lastBackupAt);
   localStorage.removeItem(DISMISSED_BACKUP_KEY);
   renderBackupReminder();
+  renderBackupStatus();
 }
 
 function renderBackupReminder() {
@@ -3090,7 +3590,7 @@ function renderBackupReminder() {
     return;
   }
 
-  const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
+  const lastBackup = state.lastBackupAt || localStorage.getItem(LAST_BACKUP_KEY);
   const dismissedAt = localStorage.getItem(DISMISSED_BACKUP_KEY);
   const now = Date.now();
   const reminderMs = BACKUP_REMINDER_DAYS * 24 * 60 * 60 * 1000;
@@ -3103,6 +3603,15 @@ function renderBackupReminder() {
   els.backupReminderText.textContent = lastBackup
     ? t("backupRecent", daysSince(lastBackup))
     : t("backupNever");
+}
+
+function renderBackupStatus() {
+  if (!els.backupStatusText || !els.backupStatusValue) return;
+  els.backupStatusText.textContent = state.backupDirty ? t("backupStatusDirty") : t("backupStatusClean");
+  els.backupStatusValue.textContent = state.lastBackupAt
+    ? `${t("lastBackup")}: ${formatShortDate(state.lastBackupAt.slice(0, 10))}`
+    : t("neverBackedUp");
+  els.backupStatusValue.classList.toggle("is-negative", Boolean(state.backupDirty));
 }
 
 function dismissBackupReminder() {
@@ -3123,6 +3632,8 @@ function importData(event) {
       const imported = JSON.parse(reader.result);
       if (!imported.months || !imported.currentMonth) throw new Error("bad format");
       state = normalizeStateLanguage(imported);
+      state.backupDirty = false;
+      state.lastBackupAt = imported.lastBackupAt || imported.backupCreatedAt || new Date().toISOString();
       saveState();
       render();
     } catch {

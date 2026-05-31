@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=quick-allocate-1">
+    <link rel="stylesheet" href="styles.css?v=manual-backup-1">
   </head>
   <body>
     <div class="app-shell">
@@ -105,6 +105,7 @@
                     <option value="available-asc">Least available</option>
                     <option value="updated-desc">Recently updated</option>
                     <option value="updated-asc">Oldest updated</option>
+                    <option value="manual">Manual order</option>
                   </select>
                 </label>
               </div>
@@ -169,10 +170,17 @@
             <div class="settings-list">
               <article class="settings-item">
                 <div>
-                  <strong>Backup</strong>
-                  <p>Save a JSON backup file to iCloud Drive.</p>
+                  <strong id="backupSettingTitle">Backup</strong>
+                  <p id="backupSettingText">Save a JSON backup file to iCloud Drive.</p>
                 </div>
                 <button id="settingsBackupBtn" type="button">Back Up</button>
+              </article>
+              <article class="settings-item passive">
+                <div>
+                  <strong id="backupStatusTitle">Backup Status</strong>
+                  <p id="backupStatusText">All financial changes are backed up.</p>
+                </div>
+                <span id="backupStatusValue">—</span>
               </article>
               <article class="settings-item">
                 <div>
@@ -301,7 +309,7 @@
 
           <section class="panel expense-panel">
             <div class="panel-title">
-              <h2>Expenses</h2>
+              <h2>Records</h2>
               <div class="inline-actions">
                 <button id="detailMoveBtn" class="secondary-action" type="button">Move</button>
                 <button id="detailAddExpenseBtn" type="button">Add</button>
@@ -317,6 +325,7 @@
                         <span class="sort-arrow" aria-hidden="true"></span>
                       </button>
                     </th>
+                    <th>Type</th>
                     <th>Note</th>
                     <th class="number">
                       <button class="sort-head" type="button" data-action="sort-detail-expenses" data-field="amount" aria-label="Sort expenses by amount">
@@ -417,6 +426,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=quick-allocate-1"></script>
+    <script src="app.js?v=manual-backup-1"></script>
   </body>
 </html>
