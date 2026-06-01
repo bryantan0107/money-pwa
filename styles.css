@@ -518,73 +518,154 @@ h2 {
 }
 
 .allocation-insights {
+  display: block;
+}
+
+.money-structure-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(242, 242, 247, 0.58);
+}
+
+.money-structure-title {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.money-structure-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.allocation-insights article {
+.structure-cell {
+  display: grid;
+  gap: 3px;
   min-width: 0;
-  padding: 10px 11px;
+  min-height: 76px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(242, 242, 247, 0.58);
+  background: rgba(255, 255, 255, 0.72);
 }
 
-.allocation-insights span {
-  display: block;
+.structure-cell span {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 650;
-  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.allocation-insights strong {
-  display: block;
+.structure-cell strong {
   color: var(--text);
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
-.allocation-insights small {
-  display: block;
-  margin-top: 3px;
+.structure-unallocated strong {
+  color: var(--orange);
+}
+
+.structure-cell strong.is-negative {
+  color: var(--red);
+}
+
+.structure-cell em,
+.structure-cell small {
   color: var(--muted);
   font-size: 11px;
-}
-
-.allocation-detail-table td:first-child {
+  font-style: normal;
   font-weight: 650;
+  line-height: 1.2;
 }
 
-.allocation-detail-table {
+.structure-cell small {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.allocation-detail-list {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.allocation-role-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.allocation-role-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(242, 242, 247, 0.72);
+}
+
+.allocation-role-header div {
+  display: grid;
+  gap: 3px;
   min-width: 0;
-  table-layout: fixed;
 }
 
-.allocation-detail-table thead {
-  display: none;
+.allocation-role-header strong {
+  font-size: 15px;
+  line-height: 1.2;
 }
 
-.allocation-detail-table .editable-number {
-  color: var(--blue);
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: rgba(0, 113, 227, 0.25);
-  text-underline-offset: 3px;
-}
-
-.allocation-detail-table input {
-  width: 100%;
-  min-height: 32px;
-  padding: 0 8px;
+.allocation-role-header span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 750;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.allocation-mobile-row td {
-  padding: 12px 10px;
+.allocation-role-header small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.allocation-role-rows {
+  display: grid;
+}
+
+.allocation-category-row {
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.allocation-category-row:first-child {
+  border-top: 0;
+}
+
+.allocation-category-row.is-row-editing {
+  background: rgba(0, 113, 227, 0.06);
+}
+
+.allocation-detail-list .empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.allocation-detail-list input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .allocation-row-main,
@@ -598,6 +679,21 @@ h2 {
 .allocation-row-main strong {
   min-width: 0;
   font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.allocation-name-button {
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
   overflow-wrap: anywhere;
 }
 
@@ -642,6 +738,18 @@ h2 {
   grid-template-columns: minmax(88px, 1fr) minmax(62px, 0.62fr);
   gap: 8px;
   width: min(210px, 54vw);
+}
+
+.allocation-derived-percent {
+  min-height: 32px;
+  padding: 0 8px;
+  border-color: var(--line);
+  color: var(--muted);
+  background: rgba(242, 242, 247, 0.58);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 
 .allocation-row-meta {
@@ -1087,60 +1195,7 @@ label.field.compact {
   padding: 14px;
 }
 
-.available-summary {
-  display: grid;
-  gap: 8px;
-  width: 100%;
-}
-
-.available-summary-total {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(242, 242, 247, 0.58);
-}
-
-.available-summary-total span,
-.available-summary-grid span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.available-summary-total strong {
-  font-size: 24px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.available-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.available-summary-grid article {
-  min-width: 0;
-  padding: 10px 11px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.66);
-}
-
-.available-summary-grid strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--green);
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-
-.available-summary strong.is-negative,
+.fund-role-filter strong.is-negative,
 .fund-card .amount.is-negative {
   color: var(--red);
 }
@@ -1157,7 +1212,7 @@ label.field.compact {
   gap: 4px;
   padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(242, 242, 247, 0.72);
 }
 
@@ -1167,16 +1222,31 @@ label.field.compact {
 }
 
 .segmented-control button {
+  display: grid;
+  gap: 4px;
   min-width: 0;
-  min-height: 34px;
-  padding: 0 8px;
+  min-height: 48px;
+  padding: 7px 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 9px;
   color: var(--muted);
   background: transparent;
   box-shadow: none;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
+}
+
+.segmented-control button span,
+.segmented-control button strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.segmented-control button strong {
+  color: var(--green);
+  font-size: 13px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .segmented-control button[aria-pressed="true"] {
@@ -3042,13 +3112,11 @@ menu .dialog-delete-btn {
     font-size: 13px;
   }
 
-  #allocationDetailView .table-wrap,
   .project-entries-wrap {
     overflow-x: visible;
     padding: 0 8px 10px;
   }
 
-  #allocationDetailView .allocation-detail-table,
   .records-table,
   .project-entries-table,
   .detail-view .detail-expense-table {
@@ -3059,8 +3127,6 @@ menu .dialog-delete-btn {
     table-layout: fixed;
   }
 
-  #allocationDetailView .allocation-detail-table th,
-  #allocationDetailView .allocation-detail-table td,
   .records-table th,
   .records-table td,
   .project-entries-table th,

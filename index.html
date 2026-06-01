@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=available-role-1">
+    <link rel="stylesheet" href="styles.css?v=allocation-visual-hierarchy-1">
   </head>
   <body>
     <div class="app-shell">
@@ -64,7 +64,6 @@
               </div>
               <span class="chevron" aria-hidden="true">›</span>
             </div>
-            <div id="allocationBar" class="allocation-bar" aria-label="Income allocation chart"></div>
             <div class="storage-stats">
               <article class="metric income">
                 <span>Total Income</span>
@@ -79,7 +78,6 @@
                 <strong id="storageUnallocatedAmount">0.00</strong>
               </article>
             </div>
-            <div id="allocationLegend" class="allocation-legend"></div>
           </section>
 
           <section class="panel funds-panel">
@@ -92,32 +90,11 @@
                   <button id="addFundBtn" class="add-fund-icon" type="button" aria-label="Add category">+</button>
                 </div>
               </div>
-              <section class="available-summary" aria-label="Available balance summary">
-                <article class="available-summary-total">
-                  <span data-i18n="totalAvailable">Total Available</span>
-                  <strong id="availableSummaryTotal">€0.00</strong>
-                </article>
-                <div class="available-summary-grid">
-                  <article>
-                    <span data-i18n="spendable">Spendable</span>
-                    <strong id="availableSummarySpendable">€0.00</strong>
-                  </article>
-                  <article>
-                    <span data-i18n="fixedReserved">Fixed Reserved</span>
-                    <strong id="availableSummaryFixed">€0.00</strong>
-                  </article>
-                  <article>
-                    <span data-i18n="savings">Savings</span>
-                    <strong id="availableSummarySavings">€0.00</strong>
-                  </article>
-                </div>
-                <p id="availableSubscriptionNote" class="available-subscription-note" hidden></p>
-              </section>
               <div id="fundRoleFilter" class="segmented-control fund-role-filter" role="tablist" aria-label="Category role filter">
-                <button type="button" data-role-filter="all">All</button>
-                <button type="button" data-role-filter="spending" aria-pressed="true">Spending</button>
-                <button type="button" data-role-filter="fixed">Fixed</button>
-                <button type="button" data-role-filter="savings">Savings</button>
+                <button type="button" data-role-filter="spending" aria-pressed="true"><span>Spending</span><strong id="availableSummarySpendable">€0.00</strong></button>
+                <button type="button" data-role-filter="fixed"><span>Fixed</span><strong id="availableSummaryFixed">€0.00</strong></button>
+                <button type="button" data-role-filter="savings"><span>Savings</span><strong id="availableSummarySavings">€0.00</strong></button>
+                <button type="button" data-role-filter="all"><span>All</span><strong aria-hidden="true"> </strong></button>
               </div>
               <div class="fund-tools">
                 <label class="search-field" aria-label="Search categories">
@@ -264,8 +241,6 @@
               </div>
               <button id="allocationDetailAddIncomeBtn" class="primary-action" type="button">Add</button>
             </div>
-            <p id="allocationDetailPercent" class="allocation-detail-summary">0.00 / 0.00 allocated (0% allocated)</p>
-            <div id="allocationDetailBar" class="allocation-bar large" aria-label="Income allocation detail chart"></div>
             <div class="detail-stats">
               <article class="metric income">
                 <span>Total Income</span>
@@ -280,7 +255,7 @@
                 <strong id="allocationDetailUnallocated">0.00</strong>
               </article>
             </div>
-            <div id="allocationInsights" class="allocation-insights"></div>
+            <div id="allocationInsights" class="allocation-insights money-structure-list"></div>
           </section>
 
           <section class="panel expense-panel">
@@ -288,20 +263,7 @@
               <h2>Category Allocation</h2>
               <button id="allocationDetailQuickAllocateBtn" class="primary-action" type="button">Allocate</button>
             </div>
-            <div id="allocationDetailEditActions" class="allocation-edit-actions" hidden>
-              <button type="button" id="allocationDetailCancelBtn" class="secondary-action" hidden>Cancel</button>
-              <button type="button" id="allocationDetailSaveBtn" hidden>Save</button>
-            </div>
-            <div class="table-wrap">
-              <table class="allocation-detail-table compact-data-table">
-                <thead>
-                  <tr>
-                    <th>Category Allocation</th>
-                  </tr>
-                </thead>
-                <tbody id="allocationDetailTable"></tbody>
-              </table>
-            </div>
+            <div id="allocationDetailTable" class="allocation-detail-list" aria-label="Category Allocation"></div>
           </section>
         </section>
 
@@ -459,6 +421,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=available-role-1"></script>
+    <script src="app.js?v=allocation-visual-hierarchy-1"></script>
   </body>
 </html>
