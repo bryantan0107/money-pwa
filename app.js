@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.01.2";
+const APP_VERSION = "2026.06.01.3";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
 const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
@@ -100,11 +100,15 @@ const I18N = {
     entries: "Entries",
     settle: "Settle",
     reopen: "Reopen",
+    activeProjects: "Active",
+    settledProjects: "Settled",
+    started: "Started",
     noProjects: "No projects yet.",
     noProjectEntries: "No entries yet.",
     projectSettledNote: "This project has been settled into official expense records.",
     settleProjectConfirm: (name, count) => `Settle ${name}? This will create ${count} official expense record${count === 1 ? "" : "s"} grouped by category.`,
-    reopenProjectConfirm: name => `Reopen ${name}? This will remove the official expense records created by settlement.`,
+    reopenProjectConfirm: name => `Reopen ${name}? This will delete the official expense records created by settlement and restore the project to active.`,
+    settledProjectDeleteDisabled: "Reopen this project before deleting it.",
     travel: "Travel",
     event: "Event",
     shopping: "Shopping",
@@ -311,11 +315,15 @@ const I18N = {
     entries: "明细",
     settle: "结算",
     reopen: "重新打开",
+    activeProjects: "进行中",
+    settledProjects: "已结算",
+    started: "开始",
     noProjects: "还没有项目。",
     noProjectEntries: "还没有项目明细。",
     projectSettledNote: "这个项目已经结算为正式支出记录。",
     settleProjectConfirm: (name, count) => `结算 ${name}？会按分类生成 ${count} 条正式支出记录。`,
-    reopenProjectConfirm: name => `重新打开 ${name}？这会删除结算时生成的正式支出记录。`,
+    reopenProjectConfirm: name => `重新打开 ${name}？这会删除结算时生成的正式支出记录，并把项目恢复为进行中。`,
+    settledProjectDeleteDisabled: "请先重新打开这个项目，再删除。",
     travel: "旅行",
     event: "活动",
     shopping: "购物",
@@ -942,12 +950,19 @@ function normalizeStateLanguage(rawState) {
   rawState.projects.forEach(project => {
     project.name = shouldTranslateLegacyNames ? translateName(project.name || "") : (project.name || "");
     project.type = project.type || "other";
-    project.status = project.status || "active";
+    project.status = project.status === "settled" ? "settled" : "active";
     project.monthId = project.monthId || rawState.currentMonth;
+    project.startMonth = normalizeProjectStartMonth(project, rawState.currentMonth);
     project.createdAt = project.createdAt || fallbackTimestamp(project.startDate || `${project.monthId || rawState.currentMonth}-01`);
     project.updatedAt = project.updatedAt || project.createdAt;
     project.entries = Array.isArray(project.entries) ? project.entries : [];
     project.settlementExpenseIds = Array.isArray(project.settlementExpenseIds) ? project.settlementExpenseIds : [];
+    project.defaultCategory = shouldTranslateLegacyNames ? translateName(project.defaultCategory || "") : (project.defaultCategory || "");
+    if (!project.defaultCategory && project.defaultFundId) {
+      const projectMonth = rawState.months?.[project.monthId] || rawState.months?.[project.startMonth];
+      const defaultName = projectMonth?.funds?.find(fund => fund.id === project.defaultFundId)?.name || "";
+      project.defaultCategory = shouldTranslateLegacyNames ? translateName(defaultName) : defaultName;
+    }
     project.entries.forEach(entry => {
       entry.category = translateNote(entry.category || "");
       entry.note = translateNote(entry.note || "");
@@ -996,6 +1011,11 @@ function normalizeStateLanguage(rawState) {
   });
   repairCategoryLifecycleGaps(rawState);
   return rawState;
+}
+
+function normalizeProjectStartMonth(project, fallbackMonth) {
+  const candidate = project.startMonth || project.monthId || (project.startDate || "").slice(0, 7) || fallbackMonth;
+  return /^\d{4}-\d{2}$/.test(candidate) ? candidate : fallbackMonth;
 }
 
 function repairCategoryLifecycleGaps(rawState) {
@@ -1191,7 +1211,26 @@ function selectedFund() {
 }
 
 function selectedProject() {
-  return state.projects.find(project => project.id === selectedProjectId && project.monthId === state.currentMonth) || null;
+  const project = state.projects.find(item => item.id === selectedProjectId);
+  return project && isProjectVisibleInMonth(project, state.currentMonth) ? project : null;
+}
+
+function projectStartMonth(project) {
+  return normalizeProjectStartMonth(project, state.currentMonth);
+}
+
+function isProjectVisibleInMonth(project, monthId) {
+  return Boolean(project) && monthId >= projectStartMonth(project);
+}
+
+function visibleProjectsForMonth(monthId = state.currentMonth) {
+  return state.projects
+    .filter(project => isProjectVisibleInMonth(project, monthId))
+    .sort(sortProjects);
+}
+
+function sortProjects(a, b) {
+  return (b.updatedAt || b.startDate || "").localeCompare(a.updatedAt || a.startDate || "");
 }
 
 function money(value) {
@@ -2400,35 +2439,45 @@ function recordMatchesSearch(record, query) {
 }
 
 function renderProjects() {
-  const projects = state.projects.filter(project => project.monthId === state.currentMonth).sort((a, b) => {
-    const statusDiff = Number(a.status === "settled") - Number(b.status === "settled");
-    if (statusDiff !== 0) return statusDiff;
-    return (b.updatedAt || b.startDate || "").localeCompare(a.updatedAt || a.startDate || "");
-  });
+  const projects = visibleProjectsForMonth();
+  const activeProjects = projects.filter(project => project.status !== "settled");
+  const settledProjects = projects.filter(project => project.status === "settled");
+  const sections = [
+    { title: t("activeProjects"), items: activeProjects },
+    { title: t("settledProjects"), items: settledProjects }
+  ].filter(section => section.items.length);
 
-  els.projectsList.innerHTML = projects.length
-    ? projects.map(project => {
-      const total = projectTotal(project);
-      const breakdown = projectBreakdown(project);
-      const defaultFund = fundNameById(project.defaultFundId);
-      return `
-        <article class="project-card ${project.status === "settled" ? "is-settled" : ""}" data-action="view-project" data-id="${project.id}">
-          <div class="project-card-head">
-            <div>
-              <h3>${escapeHtml(project.name)}</h3>
-            </div>
-            <strong>${money(total)}</strong>
-          </div>
-          <div class="project-card-meta">
-            <span>${escapeHtml(projectDateRange(project))}</span>
-            <span>${escapeHtml(defaultFund || "-")}</span>
-            <span>${project.status === "settled" ? t("settled") : t("active")}</span>
-          </div>
-          <div class="mini-breakdown">${renderAllocationBarSegments(breakdown, total)}</div>
-        </article>
-      `;
-    }).join("")
+  els.projectsList.innerHTML = sections.length
+    ? sections.map(section => `
+      <section class="project-group">
+        <h3>${escapeHtml(section.title)}</h3>
+        ${section.items.map(renderProjectCard).join("")}
+      </section>
+    `).join("")
     : `<p class="empty">${t("noProjects")}</p>`;
+}
+
+function renderProjectCard(project) {
+  const total = projectTotal(project);
+  const breakdown = projectBreakdown(project);
+  const defaultFund = projectDefaultCategoryName(project);
+  return `
+    <article class="project-card ${project.status === "settled" ? "is-settled" : ""}" data-action="view-project" data-id="${project.id}">
+      <div class="project-card-head">
+        <div>
+          <h3>${escapeHtml(project.name)}</h3>
+        </div>
+        <strong>${money(total)}</strong>
+      </div>
+      <div class="project-card-meta">
+        <span>${escapeHtml(projectDateRange(project))}</span>
+        <span>${escapeHtml(defaultFund || "-")}</span>
+        <span>${escapeHtml(t("started"))} ${escapeHtml(formatMonthLabel(projectStartMonth(project)))}</span>
+        <span>${project.status === "settled" ? t("settled") : t("active")}</span>
+      </div>
+      <div class="mini-breakdown">${renderAllocationBarSegments(breakdown, total)}</div>
+    </article>
+  `;
 }
 
 function renderProjectDetail() {
@@ -2445,7 +2494,7 @@ function renderProjectDetail() {
   els.projectDetailStatus.classList.toggle("is-settled", isSettled);
   els.projectDetailStatus.innerHTML = `<i></i><span>${isSettled ? t("settled") : t("active")}</span>`;
   els.projectDetailTotal.textContent = money(total);
-  els.projectDetailDefaultFund.textContent = fundNameById(project.defaultFundId) || "-";
+  els.projectDetailDefaultFund.textContent = projectDefaultCategoryName(project) || "-";
   els.projectDetailDates.textContent = projectDateRange(project);
   els.projectDetailName.title = t("editProject");
   els.projectDetailMetaBtn.title = t("editProject");
@@ -2459,6 +2508,9 @@ function renderProjectDetail() {
     `).join("")
     : `<p class="empty compact-empty">${t("noProjectEntries")}</p>`;
   els.addProjectEntryBtn.hidden = isSettled;
+  els.deleteProjectBtn.hidden = isSettled;
+  els.deleteProjectBtn.disabled = isSettled;
+  els.deleteProjectBtn.title = isSettled ? t("settledProjectDeleteDisabled") : t("deleteProject");
   els.settleProjectBtn.textContent = isSettled ? t("reopen") : t("settle");
   els.settleProjectBtn.disabled = !isSettled && total <= 0;
   els.settleProjectBtn.classList.toggle("primary-action", !isSettled);
@@ -2466,9 +2518,9 @@ function renderProjectDetail() {
 
   els.projectEntriesList.innerHTML = entries.length
     ? entries.map(entry => {
-      const categoryName = fundNameById(entry.fundId) || entry.category || t("other");
+      const categoryName = projectEntryCategoryName(entry, project) || t("other");
       return `
-      <tr class="clickable-row" data-action="edit-project-entry" data-id="${entry.id}" data-kind="projectEntry" tabindex="0" aria-label="${escapeAttr(t("editRecord", categoryName, money(entry.amount)))}">
+      <tr ${isSettled ? "" : `class="clickable-row" data-action="edit-project-entry" data-id="${entry.id}" data-kind="projectEntry" tabindex="0" aria-label="${escapeAttr(t("editRecord", categoryName, money(entry.amount)))}"`}>
         <td>${escapeHtml(formatShortDate(entry.date))}</td>
         <td>${escapeHtml(categoryName)}</td>
         <td>${escapeHtml(entry.note || "-")}</td>
@@ -2487,21 +2539,50 @@ function projectBreakdown(project) {
   const colors = ["#ff3b30", "#ff8a1f", "#f5c400", "#34a853", "#0071e3", "#8e8e93"];
   const totals = new Map();
   project.entries.forEach(entry => {
-    const key = entry.fundId || project.defaultFundId || "";
+    const key = projectEntryCategoryName(entry, project) || t("other");
     totals.set(key, (totals.get(key) || 0) + Number(entry.amount || 0));
   });
   return [...totals.entries()]
     .filter(([, amount]) => amount > 0)
-    .map(([fundId, amount], index) => ({
-      label: fundNameById(fundId) || t("other"),
+    .map(([category, amount], index) => ({
+      label: category,
       amount,
-      fundId,
+      category,
+      fundId: currentMonth().funds.find(fund => fund.name === category)?.id || "",
       color: colors[index % colors.length]
     }));
 }
 
-function fundNameById(id) {
-  return currentMonth().funds.find(fund => fund.id === id)?.name || "";
+function fundById(id, month = currentMonth()) {
+  return month.funds.find(fund => fund.id === id) || null;
+}
+
+function fundByName(name, month = currentMonth()) {
+  return month.funds.find(fund => fund.name === name) || null;
+}
+
+function fundNameById(id, month = currentMonth()) {
+  return fundById(id, month)?.name || "";
+}
+
+function projectDefaultCategoryName(project, month = currentMonth()) {
+  if (!project) return "";
+  return fundNameById(project.defaultFundId, month) || project.defaultCategory || "";
+}
+
+function projectDefaultFundInCurrentMonth(project) {
+  if (!project) return null;
+  return fundById(project.defaultFundId) || fundByName(project.defaultCategory);
+}
+
+function projectEntryCategoryName(entry, project, month = currentMonth()) {
+  if (!entry) return projectDefaultCategoryName(project, month);
+  return fundNameById(entry.fundId, month) || entry.category || projectDefaultCategoryName(project, month);
+}
+
+function projectEntryFundInCurrentMonth(entry, project) {
+  const categoryName = projectEntryCategoryName(entry, project);
+  return fundById(entry?.fundId) || fundByName(categoryName) || projectDefaultFundInCurrentMonth(project);
 }
 
 function projectTypeLabel(type) {
@@ -2806,7 +2887,7 @@ function openDialog(mode, id = null, defaults = {}) {
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
-  const canDelete = ["expense", "project", "fund"].includes(mode) && Boolean(id);
+  const canDelete = ["expense", "project", "fund"].includes(mode) && Boolean(id) && !(mode === "project" && item?.status === "settled");
   els.deleteDialogBtn.hidden = !canDelete;
   els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : mode === "fund" ? t("delete") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
@@ -2869,8 +2950,9 @@ function fieldTemplates(mode, item) {
   }
 
   if (mode === "project") {
+    const selectedFund = projectDefaultFundInCurrentMonth(item);
     const funds = currentMonth().funds
-      .map(fund => `<option value="${fund.id}" ${item.defaultFundId === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
+      .map(fund => `<option value="${fund.id}" ${selectedFund?.id === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
       .join("");
     return `
       ${field(t("name"), "name", item.name || "", "text")}
@@ -2884,8 +2966,9 @@ function fieldTemplates(mode, item) {
 
   if (mode === "projectEntry") {
     const project = selectedProject();
+    const selectedFund = projectEntryFundInCurrentMonth(item, project);
     const funds = currentMonth().funds
-      .map(fund => `<option value="${fund.id}" ${(item.fundId || project?.defaultFundId) === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
+      .map(fund => `<option value="${fund.id}" ${selectedFund?.id === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
       .join("");
     return `
       ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
@@ -3474,33 +3557,17 @@ function deleteProjectById(projectId, closeDialogAfterDelete) {
   const project = state.projects.find(item => item.id === projectId);
   if (!project) return;
 
-  const isSettled = project.status === "settled";
-  const message = isSettled
-    ? t("deleteSettledProjectConfirm", project.name)
-    : t("deleteProjectConfirm", project.name);
-  if (!window.confirm(message)) return;
-
-  const month = state.months[project.monthId] || currentMonth();
-  const settlementIds = new Set(project.settlementExpenseIds || []);
-  let removedLinkedExpense = false;
-
-  if (isSettled && settlementIds.size) {
-    month.expenses = month.expenses.filter(expense => {
-      if (!settlementIds.has(expense.id)) return true;
-      markFundUpdatedByNameInMonth(month, expense.category);
-      removedLinkedExpense = true;
-      return false;
-    });
+  if (project.status === "settled") {
+    showToast(t("settledProjectDeleteDisabled"));
+    return;
   }
+
+  if (!window.confirm(t("deleteProjectConfirm", project.name))) return;
 
   state.projects = state.projects.filter(item => item.id !== project.id);
   selectedProjectId = null;
   detailReturnTab = "projects";
   activeTab = "projects";
-
-  if (removedLinkedExpense) {
-    cascadeLaterMonthStartsQuietly();
-  }
 
   markFinancialDirty();
   saveState();
@@ -3709,9 +3776,11 @@ function transferAllocation(data) {
 }
 
 function saveProject(data) {
+  const defaultFund = fundById(data.defaultFundId);
   const payload = {
     name: data.name.trim(),
     defaultFundId: data.defaultFundId,
+    defaultCategory: defaultFund?.name || "",
     startDate: data.startDate,
     endDate: data.endDate
   };
@@ -3729,6 +3798,7 @@ function saveProject(data) {
       type: "other",
       ...payload,
       monthId: state.currentMonth,
+      startMonth: state.currentMonth,
       status: "active",
       entries: [],
       settlementExpenseIds: [],
@@ -3756,11 +3826,13 @@ function saveProjectEntry(data) {
     alert(t("validAmount"));
     return;
   }
+  const fund = fundById(data.fundId) || fundByName(project.defaultCategory);
+  if (!fund) return;
 
   const payload = {
     date: data.date,
-    fundId: data.fundId || project.defaultFundId,
-    category: fundNameById(data.fundId || project.defaultFundId) || "",
+    fundId: fund.id,
+    category: fund.name,
     note: data.note.trim(),
     amount
   };
@@ -3793,16 +3865,17 @@ function settleOrReopenProject() {
 }
 
 function settleProject(project) {
+  if (project.status === "settled" || (project.settlementExpenseIds || []).length) return;
   const breakdown = projectBreakdown(project);
   if (!breakdown.length) return;
   if (!window.confirm(t("settleProjectConfirm", project.name, breakdown.length))) return;
 
   const month = currentMonth();
-  const settlementDate = project.endDate || defaultEntryDateForCurrentMonth();
+  const settlementDate = defaultEntryDateForCurrentMonth();
   const createdIds = [];
 
   breakdown.forEach(item => {
-    const fund = month.funds.find(entry => entry.id === item.fundId);
+    const fund = month.funds.find(entry => entry.id === item.fundId) || month.funds.find(entry => entry.name === item.category);
     if (!fund) return;
     const stamp = nowStamp();
     const expense = {
@@ -3819,9 +3892,11 @@ function settleProject(project) {
     createdIds.push(expense.id);
     markFundUpdatedByName(fund.name);
   });
+  if (!createdIds.length) return;
 
   project.status = "settled";
   project.settlementExpenseIds = createdIds;
+  project.settledMonth = state.currentMonth;
   project.settledAt = nowStamp();
   project.updatedAt = nowStamp();
   cascadeLaterMonthStartsQuietly();
@@ -3834,12 +3909,22 @@ function reopenProject(project) {
   if (!window.confirm(t("reopenProjectConfirm", project.name))) return;
 
   const ids = new Set(project.settlementExpenseIds || []);
-  const month = currentMonth();
-  month.expenses = month.expenses.filter(expense => !ids.has(expense.id));
+  const affectedMonths = new Set();
+  Object.entries(state.months).forEach(([monthId, month]) => {
+    month.expenses = month.expenses.filter(expense => {
+      if (!ids.has(expense.id)) return true;
+      markFundUpdatedByNameInMonth(month, expense.category);
+      affectedMonths.add(monthId);
+      return false;
+    });
+  });
   project.status = "active";
   project.settlementExpenseIds = [];
+  project.settledMonth = "";
+  project.settledAt = "";
   project.updatedAt = nowStamp();
-  cascadeLaterMonthStartsQuietly();
+  const cascadeFrom = [...affectedMonths].sort()[0] || state.currentMonth;
+  cascadeLaterMonthStartsQuietly(cascadeFrom);
   markFinancialDirty();
   saveState();
   render();

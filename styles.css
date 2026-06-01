@@ -1470,6 +1470,20 @@ label.field.compact {
   padding: 0 12px 12px;
 }
 
+.project-group {
+  display: grid;
+  gap: 8px;
+}
+
+.project-group > h3 {
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
 .project-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1491,8 +1505,12 @@ label.field.compact {
 
 .project-card h3 {
   margin: 2px 0 0;
+  color: var(--text);
   font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
   line-height: 1.15;
+  text-transform: none;
 }
 
 .project-card-head strong {
