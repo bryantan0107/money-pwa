@@ -7,7 +7,12 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.05.31.2";
+const APP_VERSION = "2026.06.01.1";
+const CATEGORY_ROLES = ["fixed", "spending", "savings"];
+const BILLING_CYCLES = ["monthly", "yearly", "other"];
+const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
+const SAVINGS_ROLE_SEEDS = new Set(["savings", "investment fund", "emergency fund"]);
+const SUBSCRIPTION_SEEDS = new Set(["youtube music", "apple storage", "phone", "gym"]);
 const I18N = {
   en: {
     appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
@@ -24,11 +29,45 @@ const I18N = {
     incomeStorage: "Income Storage",
     allocationSummary: (allocated, total) => `${allocated} of ${total} allocated`,
     allocationDetailSummary: (allocated, total, percent) => `${allocated} / ${total} allocated (${percent}% allocated)`,
-    allocationChartLabel: percent => `Income allocation chart, ${percent}% allocated`,
+    allocationChartLabel: percent => `Money structure chart, ${percent}% allocated`,
+    moneyStructure: "Money Structure",
+    fixed: "Fixed",
+    spending: "Spending",
+    savings: "Savings",
+    categoryRole: "Role",
+    categorySettings: "Category Settings",
+    editCategorySettings: "Edit Category Settings",
+    subscription: "Subscription",
+    isSubscription: "Subscription",
+    billingCycle: "Billing Cycle",
+    monthly: "Monthly",
+    yearly: "Yearly",
+    billingOther: "Other",
+    expectedAmount: "Expected Amount",
+    dueDay: "Due Day",
+    noDueDay: "No due day",
+    fixedCostRatio: "Fixed cost ratio",
+    savingsRate: "Savings rate",
+    leftAfterFixed: "Left after fixed",
+    subscriptionMonthlyTotal: "Subscriptions / month",
+    subscriptionAnnualCost: "Subscriptions / year",
+    subscriptionCount: count => `${count} subscription${count === 1 ? "" : "s"}`,
+    fixedMoveReminder: "Fixed categories can still move money out. Check that the monthly commitment stays covered.",
     noIncome: "No income yet",
     other: "Other",
     viewAll: "View All",
     availableBalance: "Available Balance",
+    totalAvailable: "Total Available",
+    spendable: "Spendable",
+    fixedReserved: "Fixed Reserved",
+    saved: "Saved",
+    reserved: "Reserved",
+    allocatedThisMonth: "Allocated this month",
+    all: "All",
+    spendingFunds: "Spending Funds",
+    noSpendingCategories: "No spending categories yet.",
+    noFixedCategories: "No fixed categories yet.",
+    noSavingsCategories: "No savings categories yet.",
     log: "Add",
     searchFunds: "Search categories",
     sort: "Sort",
@@ -179,6 +218,7 @@ const I18N = {
     validQuickAdd: "Enter a valid quick add amount.",
     validAllocations: "Please enter valid allocation amounts.",
     validTransfer: "Choose two different categories and enter a valid amount.",
+    validDueDay: "Due day must be 1-31 or empty.",
     importFailed: "Import failed. Please choose a JSON file exported by this app."
   },
   zh: {
@@ -196,11 +236,45 @@ const I18N = {
     incomeStorage: "收入分配",
     allocationSummary: (allocated, total) => `${allocated} / ${total} 已分配`,
     allocationDetailSummary: (allocated, total, percent) => `${allocated} / ${total} 已分配（已分配 ${percent}%）`,
-    allocationChartLabel: percent => `收入分配图，已分配 ${percent}%`,
+    allocationChartLabel: percent => `资金结构图，已分配 ${percent}%`,
+    moneyStructure: "资金结构",
+    fixed: "固定",
+    spending: "消费",
+    savings: "储蓄",
+    categoryRole: "角色",
+    categorySettings: "分类设置",
+    editCategorySettings: "编辑分类设置",
+    subscription: "订阅",
+    isSubscription: "订阅",
+    billingCycle: "扣款周期",
+    monthly: "每月",
+    yearly: "每年",
+    billingOther: "其他",
+    expectedAmount: "预计金额",
+    dueDay: "扣款日",
+    noDueDay: "无扣款日",
+    fixedCostRatio: "固定开销占比",
+    savingsRate: "储蓄率",
+    leftAfterFixed: "扣除固定后剩余",
+    subscriptionMonthlyTotal: "每月订阅",
+    subscriptionAnnualCost: "年度订阅",
+    subscriptionCount: count => `${count} 个订阅`,
+    fixedMoveReminder: "固定分类仍然可以移出金额。记得确认固定开销仍然够用。",
     noIncome: "还没有收入",
     other: "其他",
     viewAll: "查看全部",
     availableBalance: "可用余额",
+    totalAvailable: "总可用",
+    spendable: "可消费",
+    fixedReserved: "固定预留",
+    saved: "已储蓄",
+    reserved: "预留",
+    allocatedThisMonth: "本月分配",
+    all: "全部",
+    spendingFunds: "消费资金",
+    noSpendingCategories: "还没有消费分类。",
+    noFixedCategories: "还没有固定分类。",
+    noSavingsCategories: "还没有储蓄分类。",
     log: "添加",
     searchFunds: "搜索分类",
     sort: "排序",
@@ -351,6 +425,7 @@ const I18N = {
     validQuickAdd: "请输入有效的快速添加金额。",
     validAllocations: "请输入有效的分配金额。",
     validTransfer: "请选择两个不同的分类并输入有效金额。",
+    validDueDay: "扣款日必须是 1-31，或留空。",
     importFailed: "导入失败。请选择这个 app 导出的 JSON 备份文件。"
   }
 };
@@ -392,6 +467,52 @@ const ENGLISH_STATUS_MAP = {
   "未还": "Unpaid",
   "已还": "Paid"
 };
+
+function normalizedCategoryName(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function roleSeedFor(name) {
+  const key = normalizedCategoryName(name);
+  if (FIXED_ROLE_SEEDS.has(key)) return "fixed";
+  if (SAVINGS_ROLE_SEEDS.has(key)) return "savings";
+  return "spending";
+}
+
+function isSeededSubscription(name) {
+  return SUBSCRIPTION_SEEDS.has(normalizedCategoryName(name));
+}
+
+function normalizeCategoryRole(role) {
+  return CATEGORY_ROLES.includes(role) ? role : "spending";
+}
+
+function normalizeBillingCycle(cycle) {
+  return BILLING_CYCLES.includes(cycle) ? cycle : "monthly";
+}
+
+function seedExpectedAmount(fund) {
+  const allocation = Number(fund.allocation || 0);
+  const target = Number(fund.target || 0);
+  if (allocation > 0) return allocation;
+  if (target > 0) return target;
+  return 0;
+}
+
+function normalizeCategoryMetadata(fund) {
+  const shouldSeedRole = !fund.role;
+  fund.role = shouldSeedRole ? roleSeedFor(fund.name) : normalizeCategoryRole(fund.role);
+  const shouldSeedSubscription = fund.isSubscription === undefined && isSeededSubscription(fund.name);
+  fund.isSubscription = shouldSeedSubscription ? true : Boolean(fund.isSubscription);
+  fund.billingCycle = normalizeBillingCycle(fund.billingCycle);
+  const expectedAmount = Number(fund.expectedAmount);
+  fund.expectedAmount = Number.isFinite(expectedAmount) ? Math.max(0, expectedAmount) : 0;
+  if (shouldSeedSubscription && fund.expectedAmount === 0) {
+    fund.expectedAmount = seedExpectedAmount(fund);
+  }
+  const dueDay = fund.dueDay === null || fund.dueDay === "" || fund.dueDay === undefined ? null : Number(fund.dueDay);
+  fund.dueDay = Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31 ? dueDay : null;
+}
 
 const initialData = {
   currentMonth: "2026-05",
@@ -488,6 +609,7 @@ let refreshingForUpdate = false;
 let draggedFundName = null;
 let touchFundDrag = null;
 let suppressFundClick = false;
+let availableRoleFilter = "spending";
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -518,6 +640,7 @@ const els = {
   allocationDetailIncome: document.querySelector("#allocationDetailIncome"),
   allocationDetailAllocated: document.querySelector("#allocationDetailAllocated"),
   allocationDetailUnallocated: document.querySelector("#allocationDetailUnallocated"),
+  allocationInsights: document.querySelector("#allocationInsights"),
   allocationDetailQuickAllocateBtn: document.querySelector("#allocationDetailQuickAllocateBtn"),
   allocationDetailTable: document.querySelector("#allocationDetailTable"),
   allocationDetailEditActions: document.querySelector("#allocationDetailEditActions"),
@@ -529,10 +652,20 @@ const els = {
   detailStart: document.querySelector("#detailStart"),
   detailAllocation: document.querySelector("#detailAllocation"),
   detailSpent: document.querySelector("#detailSpent"),
+  detailRoleBtn: document.querySelector("#detailRoleBtn"),
+  detailRoleLabel: document.querySelector("#detailRoleLabel"),
+  detailRoleValue: document.querySelector("#detailRoleValue"),
+  detailSubscriptionMeta: document.querySelector("#detailSubscriptionMeta"),
   detailExpenseTable: document.querySelector("#detailExpenseTable"),
   detailMoveBtn: document.querySelector("#detailMoveBtn"),
   fundSearchInput: document.querySelector("#fundSearchInput"),
   fundSearchResults: document.querySelector("#fundSearchResults"),
+  availableSummaryTotal: document.querySelector("#availableSummaryTotal"),
+  availableSummarySpendable: document.querySelector("#availableSummarySpendable"),
+  availableSummaryFixed: document.querySelector("#availableSummaryFixed"),
+  availableSummarySavings: document.querySelector("#availableSummarySavings"),
+  availableSubscriptionNote: document.querySelector("#availableSubscriptionNote"),
+  fundRoleFilter: document.querySelector("#fundRoleFilter"),
   fundSortSelect: document.querySelector("#fundSortSelect"),
   addFundBtn: document.querySelector("#addFundBtn"),
   quickMoveBtn: document.querySelector("#quickMoveBtn"),
@@ -629,6 +762,10 @@ document.querySelector("#detailAddExpenseBtn").addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("expense", null, { category: fund.name });
 });
+els.detailRoleBtn.addEventListener("click", () => {
+  const fund = selectedFund();
+  if (fund) openDialog("categoryRole", fund.id);
+});
 els.detailMoveBtn.addEventListener("click", () => openDialog("transfer"));
 els.detailFundName.addEventListener("click", () => {
   const fund = selectedFund();
@@ -697,6 +834,13 @@ els.fundSearchInput.addEventListener("input", () => {
   renderFundSearchResults();
 });
 els.fundSearchInput.addEventListener("focus", renderFundSearchResults);
+els.fundRoleFilter.addEventListener("click", event => {
+  const button = event.target.closest("[data-role-filter]");
+  if (!button) return;
+  availableRoleFilter = button.dataset.roleFilter;
+  renderFunds();
+  renderFundSearchResults();
+});
 els.fundList.addEventListener("dragstart", startFundDrag);
 els.fundList.addEventListener("dragover", moveFundDrag);
 els.fundList.addEventListener("drop", dropFundDrag);
@@ -793,6 +937,7 @@ function normalizeStateLanguage(rawState) {
       fund.pinned = Boolean(fund.pinned);
       fund.createdAt = fund.createdAt || fallbackTimestamp(`${monthId}-01`);
       fund.updatedAt = fund.updatedAt || "";
+      normalizeCategoryMetadata(fund);
     });
     month.expenses?.forEach(expense => {
       expense.category = shouldTranslateLegacyNames ? translateName(expense.category) : expense.category;
@@ -848,6 +993,11 @@ function repairCategoryLifecycleGaps(rawState) {
         allocation: 0,
         target: Number(previousFund.target || 0),
         pinned: Boolean(previousFund.pinned),
+        role: normalizeCategoryRole(previousFund.role),
+        isSubscription: Boolean(previousFund.isSubscription),
+        billingCycle: normalizeBillingCycle(previousFund.billingCycle),
+        expectedAmount: Number(previousFund.expectedAmount || 0),
+        dueDay: previousFund.dueDay ?? null,
         createdAt: fallbackTimestamp(`${monthId}-01`),
         updatedAt: ""
       });
@@ -955,6 +1105,11 @@ function syncCreatedCategoryToLaterMonths(createdFund) {
         allocation: 0,
         target: 0,
         pinned: false,
+        role: normalizeCategoryRole(createdFund.role),
+        isSubscription: Boolean(createdFund.isSubscription),
+        billingCycle: normalizeBillingCycle(createdFund.billingCycle),
+        expectedAmount: Number(createdFund.expectedAmount || 0),
+        dueDay: createdFund.dueDay ?? null,
         createdAt: fallbackTimestamp(`${monthId}-01`),
         updatedAt: createdFund.updatedAt || nowStamp()
       };
@@ -1110,6 +1265,26 @@ function categoryEventTypeLabel(type) {
   return labels[type] || t("records");
 }
 
+function categoryRoleLabel(role) {
+  return t(normalizeCategoryRole(role));
+}
+
+function billingCycleLabel(cycle) {
+  const normalized = normalizeBillingCycle(cycle);
+  if (normalized === "monthly") return t("monthly");
+  if (normalized === "yearly") return t("yearly");
+  return t("billingOther");
+}
+
+function subscriptionMetaText(fund) {
+  if (!fund?.isSubscription) return "";
+  const parts = [billingCycleLabel(fund.billingCycle)];
+  const amount = Number(fund.expectedAmount || 0);
+  if (amount > 0) parts.push(money(amount));
+  if (fund.dueDay) parts.push(`${t("dueDay")} ${fund.dueDay}`);
+  return parts.join(" · ");
+}
+
 function fundHealth(progress) {
   if (progress <= 0) return "empty";
   if (progress < 20) return "danger";
@@ -1187,30 +1362,67 @@ function ensureFundOrderIncludesCurrentCategories() {
 }
 
 function allocationSegments(limit = 5) {
-  const month = currentMonth();
+  return moneyStructureSegments(currentMonth());
+}
+
+function moneyStructureSegments(month = currentMonth()) {
   const totalIncome = sum(month.incomes);
   const unallocated = Math.max(0, unallocatedFor(month));
-  const colors = ["#ff3b30", "#ff8a1f", "#f5c400", "#34a853", "#0071e3", "#8e8e93"];
-  const allocatedFunds = month.funds
-    .filter(fund => Number(fund.allocation || 0) > 0)
-    .sort((a, b) => Number(b.allocation || 0) - Number(a.allocation || 0));
-  const visibleFunds = allocatedFunds.slice(0, limit);
-  const otherFunds = allocatedFunds.slice(limit);
-  const segments = visibleFunds.map((fund, index) => ({
-    label: fund.name,
-    amount: Number(fund.allocation || 0),
-    color: colors[index % colors.length]
-  }));
-  const otherAmount = sum(otherFunds, "allocation");
+  const totals = {
+    fixed: roleAllocationTotal(month, "fixed"),
+    spending: roleAllocationTotal(month, "spending"),
+    savings: roleAllocationTotal(month, "savings")
+  };
+  const segmentConfig = [
+    { role: "fixed", label: t("fixed"), color: "#ff3b30" },
+    { role: "spending", label: t("spending"), color: "#ff8a1f" },
+    { role: "savings", label: t("savings"), color: "#34a853" }
+  ];
+  const segments = segmentConfig
+    .filter(segment => totals[segment.role] > 0)
+    .map(segment => ({ label: segment.label, amount: totals[segment.role], color: segment.color }));
 
-  if (otherAmount > 0) {
-    segments.push({ label: t("other"), amount: otherAmount, color: "#a1a1a6" });
-  }
   if (unallocated > 0) {
     segments.push({ label: t("unallocated"), amount: unallocated, color: "#d1d1d6", muted: true });
   }
 
   return { totalIncome, allocated: sum(month.funds, "allocation"), unallocated, segments };
+}
+
+function roleAllocationTotal(month, role) {
+  return month.funds
+    .filter(fund => normalizeCategoryRole(fund.role) === role)
+    .reduce((total, fund) => total + Number(fund.allocation || 0), 0);
+}
+
+function subscriptionInsights(month = currentMonth()) {
+  const subscriptions = month.funds.filter(fund => Boolean(fund.isSubscription));
+  return subscriptions.reduce((result, fund) => {
+    const amount = Number(fund.expectedAmount || 0);
+    const cycle = normalizeBillingCycle(fund.billingCycle);
+    if (cycle === "monthly") {
+      result.monthly += amount;
+      result.annual += amount * 12;
+    }
+    if (cycle === "yearly") {
+      result.monthly += amount / 12;
+      result.annual += amount;
+    }
+    result.count += 1;
+    return result;
+  }, { monthly: 0, annual: 0, count: 0 });
+}
+
+function availableBalanceSummary(month = currentMonth()) {
+  return month.funds.reduce((summary, fund) => {
+    const role = normalizeCategoryRole(fund.role);
+    const balance = balanceFor(fund, month);
+    summary.total += balance;
+    if (role === "fixed") summary.fixed += balance;
+    if (role === "spending") summary.spending += balance;
+    if (role === "savings") summary.savings += balance;
+    return summary;
+  }, { total: 0, spending: 0, fixed: 0, savings: 0 });
 }
 
 function render() {
@@ -1265,6 +1477,20 @@ function renderStaticLanguage() {
   document.querySelector("#incomeStorageCard .metric.allocated span").textContent = t("allocated");
   document.querySelector("#incomeStorageCard .metric.left span").textContent = t("unallocated");
   document.querySelector(".fund-title-row h2").textContent = t("availableBalance");
+  document.querySelector("[data-i18n='totalAvailable']").textContent = t("totalAvailable");
+  document.querySelector("[data-i18n='spendable']").textContent = t("spendable");
+  document.querySelector("[data-i18n='fixedReserved']").textContent = t("fixedReserved");
+  document.querySelector("[data-i18n='savings']").textContent = t("savings");
+  els.fundRoleFilter.setAttribute("aria-label", t("categoryRole"));
+  const roleFilterLabels = {
+    all: t("all"),
+    spending: t("spending"),
+    fixed: t("fixed"),
+    savings: t("savings")
+  };
+  els.fundRoleFilter.querySelectorAll("[data-role-filter]").forEach(button => {
+    button.textContent = roleFilterLabels[button.dataset.roleFilter] || button.dataset.roleFilter;
+  });
   document.querySelector("#quickMoveBtn").textContent = t("move");
   document.querySelector("#quickExpenseBtn").textContent = t("log");
   els.fundSearchInput.placeholder = t("searchFunds");
@@ -1391,6 +1617,7 @@ function renderAllocationDetail() {
   els.allocationDetailAllocated.textContent = money(allocated);
   els.allocationDetailUnallocated.textContent = money(unallocated);
   els.allocationDetailBar.innerHTML = renderAllocationBarSegments(segments, totalIncome);
+  els.allocationInsights.innerHTML = renderAllocationInsights(month);
   els.allocationDetailTable.closest("table").classList.toggle("is-editing", allocationDetailEditing);
   els.allocationDetailEditActions.hidden = !allocationDetailEditing;
   els.allocationDetailSaveBtn.hidden = !allocationDetailEditing;
@@ -1405,7 +1632,7 @@ function renderAllocationDetail() {
           <tr class="allocation-mobile-row" data-fund-id="${fund.id}">
             <td>
               <div class="allocation-row-main">
-                <strong>${escapeHtml(fund.name)}</strong>
+                <strong>${escapeHtml(fund.name)} <span class="role-chip">${categoryRoleLabel(fund.role)}</span></strong>
                 <div class="allocation-row-inputs">
                   <input name="detail-allocation:${fund.id}" data-detail-allocation-input data-fund-id="${fund.id}" value="${escapeAttr(allocation.toFixed(2))}" type="text" inputmode="decimal" autocomplete="off" aria-label="${escapeAttr(t("allocated"))} ${escapeAttr(fund.name)}">
                   <input name="detail-percent:${fund.id}" data-detail-percent-input data-fund-id="${fund.id}" value="${escapeAttr(incomeShare.toFixed(1))}" type="text" inputmode="decimal" autocomplete="off" aria-label="${escapeAttr(t("percentIncome"))} ${escapeAttr(fund.name)}">
@@ -1424,6 +1651,7 @@ function renderAllocationDetail() {
           <td>
             <div class="allocation-row-main">
               <strong>${escapeHtml(fund.name)}</strong>
+              <span class="role-chip">${categoryRoleLabel(fund.role)}</span>
               <button class="editable-number allocation-inline-value" type="button" data-action="edit-inline-allocation">
                 <span>${money(allocation)}</span>
                 <small>${incomeShare.toFixed(1)}%</small>
@@ -1438,6 +1666,40 @@ function renderAllocationDetail() {
       `;
     }).join("")
     : `<tr><td class="empty">${t("noFunds")}</td></tr>`;
+}
+
+function renderAllocationInsights(month = currentMonth()) {
+  const totalIncome = sum(month.incomes);
+  const fixedTotal = roleAllocationTotal(month, "fixed");
+  const savingsTotal = roleAllocationTotal(month, "savings");
+  const subscription = subscriptionInsights(month);
+  const fixedRatio = totalIncome > 0 ? `${Math.round((fixedTotal / totalIncome) * 100)}%` : "--";
+  const savingsRate = totalIncome > 0 ? `${Math.round((savingsTotal / totalIncome) * 100)}%` : "--";
+  const leftAfterFixed = normalizeMoney(totalIncome - fixedTotal);
+
+  return `
+    <article>
+      <span>${t("fixedCostRatio")}</span>
+      <strong>${fixedRatio}</strong>
+    </article>
+    <article>
+      <span>${t("savingsRate")}</span>
+      <strong>${savingsRate}</strong>
+    </article>
+    <article>
+      <span>${t("leftAfterFixed")}</span>
+      <strong>${money(leftAfterFixed)}</strong>
+    </article>
+    <article>
+      <span>${t("subscriptionMonthlyTotal")}</span>
+      <strong>${money(subscription.monthly)}</strong>
+      <small>${t("subscriptionCount", subscription.count)}</small>
+    </article>
+    <article>
+      <span>${t("subscriptionAnnualCost")}</span>
+      <strong>${money(subscription.annual)}</strong>
+    </article>
+  `;
 }
 
 function renderAllocationBarSegments(segments, total) {
@@ -1497,23 +1759,7 @@ function refreshInlineAllocationSummary() {
 }
 
 function allocationPreviewSegments(funds, totalIncome, limit = 5) {
-  const colors = ["#ff3b30", "#ff8a1f", "#f5c400", "#34a853", "#0071e3", "#8e8e93"];
-  const allocatedFunds = funds
-    .filter(fund => Number(fund.allocation || 0) > 0)
-    .sort((a, b) => Number(b.allocation || 0) - Number(a.allocation || 0));
-  const visibleFunds = allocatedFunds.slice(0, limit);
-  const otherFunds = allocatedFunds.slice(limit);
-  const segments = visibleFunds.map((fund, index) => ({
-    label: fund.name,
-    amount: Number(fund.allocation || 0),
-    color: colors[index % colors.length]
-  }));
-  const otherAmount = sum(otherFunds, "allocation");
-  const unallocated = Math.max(0, normalizeMoney(totalIncome - sum(funds, "allocation")));
-
-  if (otherAmount > 0) segments.push({ label: t("other"), amount: otherAmount, color: "#a1a1a6" });
-  if (unallocated > 0) segments.push({ label: t("unallocated"), amount: unallocated, color: "#d1d1d6", muted: true });
-  return segments;
+  return moneyStructureSegments({ ...currentMonth(), funds }).segments;
 }
 
 function saveInlineAllocationDetail() {
@@ -1564,11 +1810,32 @@ function saveInlineAllocationDetail() {
 function renderFunds() {
   const month = currentMonth();
   ensureFundOrderIncludesCurrentCategories();
+  const summary = availableBalanceSummary(month);
+  const subscriptions = subscriptionInsights(month);
+  els.availableSummaryTotal.textContent = money(summary.total);
+  els.availableSummarySpendable.textContent = money(summary.spending);
+  els.availableSummaryFixed.textContent = money(summary.fixed);
+  els.availableSummarySavings.textContent = money(summary.savings);
+  els.availableSummaryTotal.classList.toggle("is-negative", summary.total < 0);
+  els.availableSummarySpendable.classList.toggle("is-negative", summary.spending < 0);
+  els.availableSummaryFixed.classList.toggle("is-negative", summary.fixed < 0);
+  els.availableSummarySavings.classList.toggle("is-negative", summary.savings < 0);
+  els.availableSubscriptionNote.hidden = subscriptions.monthly <= 0;
+  els.availableSubscriptionNote.textContent = subscriptions.monthly > 0
+    ? `${t("subscriptionMonthlyTotal")}: ${money(subscriptions.monthly)}`
+    : "";
+  els.fundRoleFilter.querySelectorAll("[data-role-filter]").forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.roleFilter === availableRoleFilter));
+  });
+
   const query = els.fundSearchInput.value.trim().toLowerCase();
+  const roleFilteredFunds = availableRoleFilter === "all"
+    ? month.funds
+    : month.funds.filter(fund => normalizeCategoryRole(fund.role) === availableRoleFilter);
   const funds = query
-    ? month.funds.filter(fund => fund.name.toLowerCase().includes(query))
-    : month.funds;
-  const fundCards = funds.map(fund => {
+    ? roleFilteredFunds.filter(fund => fund.name.toLowerCase().includes(query))
+    : roleFilteredFunds;
+  const allCards = funds.map(fund => {
     const spent = expenseTotalFor(fund.name);
     const balance = balanceFor(fund);
     const available = Number(fund.start || 0) + Number(fund.allocation || 0);
@@ -1580,57 +1847,106 @@ function renderFunds() {
       spent,
       balance,
       progress,
+      role: normalizeCategoryRole(fund.role),
       health: fundHealth(progress),
       updatedAt: fundUpdatedAt(fund),
       isDepleted: balance <= 0
     };
   });
-  const pinnedFunds = fundCards.filter(item => item.fund.pinned);
-  const availableFunds = sortFundCards(fundCards.filter(item => !item.fund.pinned && !item.isDepleted));
-  const depletedFunds = sortFundCards(fundCards.filter(item => !item.fund.pinned && item.isDepleted));
   els.fundSortSelect.value = state.fundSort || DEFAULT_FUND_SORT;
   els.fundSearchResults.hidden = true;
 
-  function renderFundCard({ fund, spent, balance, progress, health, isDepleted }) {
-      return `
-        <article class="fund-card health-${health} ${isDepleted ? "is-depleted" : ""} ${fund.pinned ? "is-pinned" : ""}" data-id="${fund.id}" data-fund-name="${escapeAttr(fund.name)}" data-action="view-fund" draggable="true">
-          <div class="fund-head">
-            <span class="name">${escapeHtml(fund.name)}</span>
-            <button type="button" class="pin-btn" data-action="toggle-fund-pin" data-id="${fund.id}" aria-pressed="${fund.pinned ? "true" : "false"}" aria-label="${fund.pinned ? t("unpin") : t("pin")} ${escapeAttr(fund.name)}">${fund.pinned ? "★" : "☆"}</button>
-            <span class="amount">${money(balance)}</span>
-          </div>
-          <div class="fund-progress" aria-label="${escapeHtml(fund.name)} balance progress ${Math.round(progress)}%">
-            <span style="--progress:${progress}%"></span>
-            <small>${Math.round(progress)}%</small>
-          </div>
-          <div class="fund-foot">
-            <span>${t("allocated")} ${money(fund.allocation)}</span>
-            <span>${t("spent")} ${money(spent)}</span>
-          </div>
-        </article>
-      `;
+  function renderFundCard({ fund, spent, balance, progress, health, isDepleted, role }) {
+    const secondaryText = role === "fixed" && fund.isSubscription
+      ? subscriptionMetaText(fund)
+      : `${t("spent")} ${money(spent)}`;
+    const footLeft = role === "fixed"
+      ? `${t("reserved")} ${money(balance)}`
+      : role === "savings"
+        ? `${t("saved")} ${money(balance)}`
+        : `${t("available")} ${money(balance)}`;
+    const footRight = role === "savings"
+      ? `${t("allocatedThisMonth")} ${money(fund.allocation)}`
+      : secondaryText;
+    return `
+      <article class="fund-card health-${health} role-${role} ${isDepleted ? "is-depleted" : ""} ${fund.pinned ? "is-pinned" : ""}" data-id="${fund.id}" data-fund-name="${escapeAttr(fund.name)}" data-action="view-fund" draggable="true">
+        <div class="fund-head">
+          <span class="name">${escapeHtml(fund.name)}</span>
+          <button type="button" class="pin-btn" data-action="toggle-fund-pin" data-id="${fund.id}" aria-pressed="${fund.pinned ? "true" : "false"}" aria-label="${fund.pinned ? t("unpin") : t("pin")} ${escapeAttr(fund.name)}">${fund.pinned ? "★" : "☆"}</button>
+          <span class="amount ${balance < 0 ? "is-negative" : ""}">${money(balance)}</span>
+        </div>
+        <div class="fund-progress" aria-label="${escapeHtml(fund.name)} balance progress ${Math.round(progress)}%">
+          <span style="--progress:${progress}%"></span>
+          <small>${Math.round(progress)}%</small>
+        </div>
+        <div class="fund-foot">
+          <span>${escapeHtml(footLeft)}</span>
+          <span>${escapeHtml(footRight)}</span>
+        </div>
+      </article>
+    `;
   }
 
-  const pinnedMarkup = pinnedFunds.map(renderFundCard).join("");
-  const availableMarkup = availableFunds.map(renderFundCard).join("");
-  const depletedMarkup = depletedFunds.length
-    ? `
-      <div class="fund-group-label">
-        <span>${t("depleted")}</span>
-        <small>${depletedFunds.length}</small>
-      </div>
-      ${depletedFunds.map(renderFundCard).join("")}
-    `
-    : "";
+  function roleGroupLabel(role) {
+    if (role === "spending") return t("spendingFunds");
+    if (role === "fixed") return t("fixedReserved");
+    return t("savings");
+  }
 
-  els.fundList.innerHTML = fundCards.length
-    ? `${pinnedMarkup}${availableMarkup}${depletedMarkup}`
+  function emptyRoleMessage(role) {
+    if (role === "fixed") return t("noFixedCategories");
+    if (role === "savings") return t("noSavingsCategories");
+    return t("noSpendingCategories");
+  }
+
+  function renderSortedCardGroup(cards, showEmpty = false, role = availableRoleFilter) {
+    const pinnedCards = sortFundCards(cards.filter(item => item.fund.pinned));
+    const availableCards = sortFundCards(cards.filter(item => !item.fund.pinned && !item.isDepleted));
+    const depletedCards = sortFundCards(cards.filter(item => !item.fund.pinned && item.isDepleted));
+    const markup = [
+      pinnedCards.map(renderFundCard).join(""),
+      availableCards.map(renderFundCard).join(""),
+      depletedCards.length
+        ? `
+          <div class="fund-group-label fund-subgroup-label">
+            <span>${t("depleted")}</span>
+            <small>${depletedCards.length}</small>
+          </div>
+          ${depletedCards.map(renderFundCard).join("")}
+        `
+        : ""
+    ].join("");
+    if (markup.trim()) return markup;
+    return showEmpty ? `<p class="empty">${emptyRoleMessage(role)}</p>` : "";
+  }
+
+  function renderRoleGroup(role) {
+    const roleCards = allCards.filter(item => item.role === role);
+    if (!roleCards.length) return "";
+    return `
+      <div class="fund-group-label role-group-label">
+        <span>${roleGroupLabel(role)}</span>
+        <small>${roleCards.length}</small>
+      </div>
+      ${renderSortedCardGroup(roleCards, false, role)}
+    `;
+  }
+
+  const listMarkup = availableRoleFilter === "all"
+    ? ["spending", "fixed", "savings"].map(renderRoleGroup).join("")
+    : renderSortedCardGroup(allCards, true, availableRoleFilter);
+
+  els.fundList.innerHTML = listMarkup.trim()
+    ? listMarkup
     : `<p class="empty">${month.funds.length ? t("noMatchingFund") : t("noFundAccounts")}</p>`;
 }
 
 function renderFundSearchResults() {
   const query = els.fundSearchInput.value.trim().toLowerCase();
-  const matches = currentMonth().funds
+  const sourceFunds = availableRoleFilter === "all"
+    ? currentMonth().funds
+    : currentMonth().funds.filter(fund => normalizeCategoryRole(fund.role) === availableRoleFilter);
+  const matches = sourceFunds
     .filter(fund => !query || fund.name.toLowerCase().includes(query))
     .slice(0, 8);
 
@@ -1756,8 +2072,9 @@ function cssEscape(value) {
 }
 
 function fundDisplayGroup(fund) {
-  if (fund.pinned) return "pinned";
-  return balanceFor(fund) <= 0 ? "depleted" : "available";
+  const role = normalizeCategoryRole(fund.role);
+  if (fund.pinned) return `${role}:pinned`;
+  return `${role}:${balanceFor(fund) <= 0 ? "depleted" : "available"}`;
 }
 
 function renderDetail() {
@@ -1775,6 +2092,10 @@ function renderDetail() {
   els.detailStart.textContent = money(fund.start);
   els.detailAllocation.textContent = money(fund.allocation);
   els.detailSpent.textContent = money(spent);
+  els.detailRoleLabel.textContent = t("categoryRole");
+  els.detailRoleValue.textContent = categoryRoleLabel(fund.role);
+  els.detailSubscriptionMeta.textContent = subscriptionMetaText(fund);
+  els.detailSubscriptionMeta.hidden = !fund.isSubscription;
   els.detailExpenseTable.innerHTML = records.length
     ? records.map(record => `
       <tr class="${record.editable ? "clickable-row" : ""}" ${record.editable ? `data-action="edit-expense" data-id="${record.id}" tabindex="0" aria-label="${escapeAttr(t("editRecord", fund.name, money(Math.abs(record.amount))))}"` : ""}>
@@ -2419,7 +2740,8 @@ function openDialog(mode, id = null, defaults = {}) {
     projectEntry: selectedProject()?.entries || [],
     allocation: month.funds,
     quickAllocate: month.funds,
-    transfer: month.funds
+    transfer: month.funds,
+    categoryRole: month.funds
   }[mode];
   const item = id ? source.find(entry => entry.id === id) : defaults;
 
@@ -2431,7 +2753,8 @@ function openDialog(mode, id = null, defaults = {}) {
     projectEntry: id ? t("editProjectEntry") : t("addProjectEntry"),
     allocation: t("allocateIncome"),
     quickAllocate: t("allocateIncome"),
-    transfer: t("moveFunds")
+    transfer: t("moveFunds"),
+    categoryRole: t("editCategorySettings")
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
@@ -2466,6 +2789,34 @@ function fieldTemplates(mode, item) {
   if (mode === "fund") {
     return `
       ${field(t("name"), "name", item.name || "", "text")}
+    `;
+  }
+
+  if (mode === "categoryRole") {
+    const role = normalizeCategoryRole(item.role);
+    const billingCycle = normalizeBillingCycle(item.billingCycle);
+    const dueDay = item.dueDay === null || item.dueDay === undefined ? "" : item.dueDay;
+    return `
+      <label class="field">${t("categoryRole")}
+        <select name="role">
+          ${CATEGORY_ROLES.map(value => `<option value="${value}" ${role === value ? "selected" : ""}>${categoryRoleLabel(value)}</option>`).join("")}
+        </select>
+      </label>
+      <label class="checkbox-field">
+        <input name="isSubscription" type="checkbox" ${item.isSubscription ? "checked" : ""}>
+        <span>${t("isSubscription")}</span>
+      </label>
+      <label class="field">${t("billingCycle")}
+        <select name="billingCycle">
+          ${BILLING_CYCLES.map(value => `<option value="${value}" ${billingCycle === value ? "selected" : ""}>${billingCycleLabel(value)}</option>`).join("")}
+        </select>
+      </label>
+      <label class="field">${t("expectedAmount")}
+        <input name="expectedAmount" type="text" inputmode="decimal" autocomplete="off" value="${escapeAttr(item.expectedAmount || "")}" data-money-input>
+      </label>
+      <label class="field">${t("dueDay")}
+        <input name="dueDay" type="text" inputmode="numeric" autocomplete="off" value="${escapeAttr(dueDay)}" placeholder="${escapeAttr(t("noDueDay"))}">
+      </label>
     `;
   }
 
@@ -2793,6 +3144,11 @@ function saveEntry(event) {
     return;
   }
 
+  if (dialogMode === "categoryRole") {
+    saveCategorySettings(data);
+    return;
+  }
+
   if (dialogMode === "project") {
     saveProject(data);
     return;
@@ -2863,6 +3219,48 @@ function saveEntry(event) {
   if (affectsLaterMonthStarts) {
     cascadeLaterMonthStartsQuietly();
   }
+  markFinancialDirty();
+  saveState();
+  els.dialog.close();
+  render();
+}
+
+function saveCategorySettings(data) {
+  const fund = currentMonth().funds.find(item => item.id === editingId);
+  if (!fund) return;
+
+  const expectedAmount = parseMoneyInput(data.expectedAmount);
+  if (String(data.expectedAmount || "").trim() && expectedAmount === null) {
+    alert(t("validAmount"));
+    return;
+  }
+  const dueDayText = String(data.dueDay || "").trim();
+  const dueDay = dueDayText ? Number(dueDayText) : null;
+  if (dueDay !== null && (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)) {
+    alert(t("validDueDay"));
+    return;
+  }
+
+  const categoryName = fund.name;
+  const metadata = {
+    role: normalizeCategoryRole(data.role),
+    isSubscription: data.isSubscription === "on",
+    billingCycle: normalizeBillingCycle(data.billingCycle),
+    expectedAmount: normalizeMoney(expectedAmount || 0),
+    dueDay
+  };
+
+  sortedMonthKeys()
+    .filter(key => key >= state.currentMonth)
+    .forEach(key => {
+      const month = state.months[key];
+      month.funds
+        .filter(item => item.name === categoryName)
+        .forEach(item => {
+          Object.assign(item, metadata, { updatedAt: nowStamp() });
+        });
+    });
+
   markFinancialDirty();
   saveState();
   els.dialog.close();
@@ -3229,6 +3627,10 @@ function transferAllocation(data) {
   if (amount > fromAvailable) {
     alert(t("moveLimit", money(fromAvailable), fromFund.name));
     return;
+  }
+
+  if (normalizeCategoryRole(fromFund.role) === "fixed") {
+    showToast(t("fixedMoveReminder"));
   }
 
   const allocationMove = Math.min(Number(fromFund.allocation || 0), amount);

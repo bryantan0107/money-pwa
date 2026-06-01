@@ -517,6 +517,43 @@ h2 {
   margin: -4px 0 0;
 }
 
+.allocation-insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.allocation-insights article {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(242, 242, 247, 0.58);
+}
+
+.allocation-insights span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  margin-bottom: 4px;
+}
+
+.allocation-insights strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.allocation-insights small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .allocation-detail-table td:first-child {
   font-weight: 650;
 }
@@ -562,6 +599,22 @@ h2 {
   min-width: 0;
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  margin-left: 6px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(242, 242, 247, 0.72);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .allocation-inline-value {
@@ -619,6 +672,47 @@ h2 {
 .detail-name-button:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 4px;
+}
+
+.detail-role-button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 46px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(242, 242, 247, 0.58);
+  box-shadow: none;
+  text-align: left;
+}
+
+.detail-role-button span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.detail-role-button strong {
+  justify-self: end;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.detail-role-button small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.detail-role-button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
 }
 
 .quick-allocation-card {
@@ -811,6 +905,11 @@ label.field.compact {
   min-width: 0;
 }
 
+.funds-panel .panel-title {
+  align-items: stretch;
+  flex-direction: column;
+}
+
 .fund-primary-actions {
   display: flex;
   align-items: center;
@@ -840,7 +939,8 @@ label.field.compact {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: min(430px, 58%);
+  width: 100%;
+  min-width: 0;
 }
 
 .search-field {
@@ -987,6 +1087,104 @@ label.field.compact {
   padding: 14px;
 }
 
+.available-summary {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.available-summary-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(242, 242, 247, 0.58);
+}
+
+.available-summary-total span,
+.available-summary-grid span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.available-summary-total strong {
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.available-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.available-summary-grid article {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.available-summary-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--green);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.available-summary strong.is-negative,
+.fund-card .amount.is-negative {
+  color: var(--red);
+}
+
+.available-subscription-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.segmented-control {
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(242, 242, 247, 0.72);
+}
+
+.fund-role-filter {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+}
+
+.segmented-control button {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.segmented-control button[aria-pressed="true"] {
+  color: var(--blue);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
 .fund-group-label {
   display: flex;
   align-items: center;
@@ -997,6 +1195,18 @@ label.field.compact {
   color: var(--muted);
   font-size: 12px;
   font-weight: 650;
+}
+
+.role-group-label {
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.fund-subgroup-label {
+  font-size: 11px;
 }
 
 .fund-group-label small {
@@ -2219,6 +2429,26 @@ label.field {
   gap: 6px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(242, 242, 247, 0.58);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
 }
 
 label.field input,
