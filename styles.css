@@ -542,14 +542,26 @@ h2 {
 }
 
 .structure-cell {
-  display: grid;
-  gap: 3px;
   min-width: 0;
   min-height: 76px;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
+}
+
+.structure-cell-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.structure-cell-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
 }
 
 .structure-cell span {
@@ -574,13 +586,23 @@ h2 {
   color: var(--red);
 }
 
-.structure-cell em,
 .structure-cell small {
   color: var(--muted);
   font-size: 11px;
   font-style: normal;
   font-weight: 650;
   line-height: 1.2;
+}
+
+.structure-cell em {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 17px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .structure-cell small {

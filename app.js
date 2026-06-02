@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.01.3";
+const APP_VERSION = "2026.06.02.1";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
 const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
@@ -1701,10 +1701,14 @@ function renderMoneyStructure(month = currentMonth(), previewFunds = month.funds
         : "";
       return `
             <article class="structure-cell structure-${item.key}">
-          <span>${item.label}</span>
-              <strong class="${item.amount < 0 ? "is-negative" : ""}">${money(item.amount)}</strong>
-              <em>${percent.toFixed(1)}%</em>
-          ${subscriptionLine}
+              <div class="structure-cell-copy">
+                <span>${item.label}</span>
+                <div class="structure-cell-value">
+                  <strong class="${item.amount < 0 ? "is-negative" : ""}">${money(item.amount)}</strong>
+                  <em>${percent.toFixed(1)}%</em>
+                </div>
+                ${subscriptionLine}
+              </div>
         </article>
       `;
     }).join("")}
@@ -4341,8 +4345,32 @@ function escapeAttr(value) {
   return escapeHtml(value);
 }
 
+function isLocalDevHost() {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function shouldUseServiceWorker() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("sw") === "1") return true;
+  if (params.get("nosw") === "1") return false;
+  return !isLocalDevHost();
+}
+
+function unregisterServiceWorkersForDev() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.getRegistrations()
+    .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
+    .catch(() => {
+      // Local previews should never fail because update support is unavailable.
+    });
+}
+
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
+  if (!shouldUseServiceWorker()) {
+    unregisterServiceWorkersForDev();
+    return;
+  }
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (refreshingForUpdate) return;
     refreshingForUpdate = true;
