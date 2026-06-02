@@ -2377,6 +2377,10 @@ label.field.compact {
   border-top: 1px solid var(--line);
 }
 
+#detailView .detail-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .detail-stats .metric {
   min-height: 0;
   padding: 0;
@@ -2400,6 +2404,13 @@ label.field.compact {
   font-size: 17px;
   font-weight: 700;
   text-align: left;
+}
+
+.detail-stats .metric small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .table-wrap {
@@ -2694,6 +2705,15 @@ label.field {
   width: 18px;
   height: 18px;
   accent-color: var(--blue);
+}
+
+[data-fixed-category-settings] {
+  display: grid;
+  gap: 12px;
+}
+
+[data-fixed-category-settings][hidden] {
+  display: none;
 }
 
 label.field input,
@@ -3207,6 +3227,10 @@ menu .dialog-delete-btn {
   .detail-stats {
     gap: 8px;
     padding-top: 12px;
+  }
+
+  #detailView .detail-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .detail-stats .metric {

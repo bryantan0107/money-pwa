@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.02.2";
+const APP_VERSION = "2026.06.02.3";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
 const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
@@ -163,6 +163,7 @@ const I18N = {
     fundAllocation: "Category Allocation",
     available: "Available",
     startingBalance: "Starting Balance",
+    startingBalanceCarried: "Starting balance is carried from the previous month.",
     monthlyAllocation: "Monthly Allocation",
     spentInFund: "Spent in This Fund",
     editFund: "Edit Category",
@@ -234,6 +235,7 @@ const I18N = {
     validAllocations: "Please enter valid allocation amounts.",
     validTransfer: "Choose two different categories and enter a valid amount.",
     validDueDay: "Due day must be 1-31 or empty.",
+    duplicateCategoryName: "A category with this name already exists this month.",
     importFailed: "Import failed. Please choose a JSON file exported by this app."
   },
   zh: {
@@ -385,6 +387,7 @@ const I18N = {
     fundAllocation: "分类分配",
     available: "可用",
     startingBalance: "起始余额",
+    startingBalanceCarried: "起始余额会从上一个月份自动延续。",
     monthlyAllocation: "本月分配",
     spentInFund: "本分类已花",
     editFund: "编辑分类",
@@ -456,6 +459,7 @@ const I18N = {
     validAllocations: "请输入有效的分配金额。",
     validTransfer: "请选择两个不同的分类并输入有效金额。",
     validDueDay: "扣款日必须是 1-31，或留空。",
+    duplicateCategoryName: "本月已经有同名分类。",
     importFailed: "导入失败。请选择这个 app 导出的 JSON 备份文件。"
   }
 };
@@ -675,7 +679,6 @@ const els = {
   detailStart: document.querySelector("#detailStart"),
   detailAllocation: document.querySelector("#detailAllocation"),
   detailSpent: document.querySelector("#detailSpent"),
-  detailRoleBtn: document.querySelector("#detailRoleBtn"),
   detailRoleLabel: document.querySelector("#detailRoleLabel"),
   detailRoleValue: document.querySelector("#detailRoleValue"),
   detailSubscriptionMeta: document.querySelector("#detailSubscriptionMeta"),
@@ -815,14 +818,10 @@ document.querySelector("#detailAddExpenseBtn").addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("expense", null, { category: fund.name });
 });
-els.detailRoleBtn.addEventListener("click", () => {
-  const fund = selectedFund();
-  if (fund) openDialog("categoryRole", fund.id);
-});
 els.detailMoveBtn.addEventListener("click", () => openDialog("transfer"));
 els.detailFundName.addEventListener("click", () => {
   const fund = selectedFund();
-  if (fund) openDialog("fund", fund.id);
+  if (fund) openDialog("categoryRole", fund.id);
 });
 els.addProjectEntryBtn.addEventListener("click", () => {
   const project = selectedProject();
@@ -907,6 +906,7 @@ els.form.addEventListener("input", updateAllocationEditor);
 els.form.addEventListener("change", updateAllocationEditor);
 els.form.addEventListener("input", updateQuickAllocatePreview);
 els.form.addEventListener("change", updateQuickAllocatePreview);
+els.form.addEventListener("change", updateCategoryFixedFields);
 els.form.addEventListener("input", updateNoteAutocomplete);
 els.form.addEventListener("click", applyNoteSuggestion);
 els.form.addEventListener("keydown", event => {
@@ -951,7 +951,6 @@ function loadState() {
 }
 
 function normalizeStateLanguage(rawState) {
-  const shouldTranslateLegacyNames = rawState.languageNormalized !== true;
   if (!rawState.fundSort) rawState.fundSort = DEFAULT_FUND_SORT;
   if (!Array.isArray(rawState.fundOrder)) rawState.fundOrder = [];
   if (!rawState.language) rawState.language = DEFAULT_LANGUAGE;
@@ -962,7 +961,7 @@ function normalizeStateLanguage(rawState) {
   rawState.languageNormalized = true;
   rawState.privacyMode = Boolean(rawState.privacyMode);
   rawState.projects.forEach(project => {
-    project.name = shouldTranslateLegacyNames ? translateName(project.name || "") : (project.name || "");
+    project.name = project.name || "";
     project.type = project.type || "other";
     project.status = project.status === "settled" ? "settled" : "active";
     project.monthId = project.monthId || rawState.currentMonth;
@@ -971,15 +970,15 @@ function normalizeStateLanguage(rawState) {
     project.updatedAt = project.updatedAt || project.createdAt;
     project.entries = Array.isArray(project.entries) ? project.entries : [];
     project.settlementExpenseIds = Array.isArray(project.settlementExpenseIds) ? project.settlementExpenseIds : [];
-    project.defaultCategory = shouldTranslateLegacyNames ? translateName(project.defaultCategory || "") : (project.defaultCategory || "");
+    project.defaultCategory = project.defaultCategory || "";
     if (!project.defaultCategory && project.defaultFundId) {
       const projectMonth = rawState.months?.[project.monthId] || rawState.months?.[project.startMonth];
       const defaultName = projectMonth?.funds?.find(fund => fund.id === project.defaultFundId)?.name || "";
-      project.defaultCategory = shouldTranslateLegacyNames ? translateName(defaultName) : defaultName;
+      project.defaultCategory = defaultName;
     }
     project.entries.forEach(entry => {
-      entry.category = translateNote(entry.category || "");
-      entry.note = translateNote(entry.note || "");
+      entry.category = entry.category || "";
+      entry.note = entry.note || "";
       entry.createdAt = entry.createdAt || fallbackTimestamp(entry.date || project.startDate || `${project.monthId || rawState.currentMonth}-01`);
       entry.updatedAt = entry.updatedAt || entry.createdAt;
     });
@@ -987,21 +986,21 @@ function normalizeStateLanguage(rawState) {
   Object.entries(rawState.months || {}).forEach(([monthId, month]) => {
     month.categoryEvents = Array.isArray(month.categoryEvents) ? month.categoryEvents : [];
     month.incomes?.forEach(income => {
-      income.name = shouldTranslateLegacyNames ? translateName(income.name) : income.name;
+      income.name = income.name || "";
       income.date = income.date || `${monthId}-01`;
       income.createdAt = income.createdAt || fallbackTimestamp(income.date);
       income.updatedAt = income.updatedAt || income.createdAt;
     });
     month.funds?.forEach(fund => {
-      fund.name = shouldTranslateLegacyNames ? translateName(fund.name) : fund.name;
+      fund.name = fund.name || "";
       fund.pinned = Boolean(fund.pinned);
       fund.createdAt = fund.createdAt || fallbackTimestamp(`${monthId}-01`);
       fund.updatedAt = fund.updatedAt || "";
       normalizeCategoryMetadata(fund);
     });
     month.expenses?.forEach(expense => {
-      expense.category = shouldTranslateLegacyNames ? translateName(expense.category) : expense.category;
-      expense.note = translateNote(expense.note);
+      expense.category = expense.category || "";
+      expense.note = expense.note || "";
       expense.createdAt = expense.createdAt || fallbackTimestamp(expense.date);
       expense.updatedAt = expense.updatedAt || expense.createdAt;
     });
@@ -1009,17 +1008,17 @@ function normalizeStateLanguage(rawState) {
       event.id = event.id || crypto.randomUUID();
       event.date = event.date || `${monthId}-01`;
       event.type = event.type || "adjustment";
-      event.category = shouldTranslateLegacyNames ? translateName(event.category || "") : (event.category || "");
-      event.fromCategory = shouldTranslateLegacyNames ? translateName(event.fromCategory || "") : (event.fromCategory || "");
-      event.toCategory = shouldTranslateLegacyNames ? translateName(event.toCategory || "") : (event.toCategory || "");
-      event.note = translateNote(event.note || "");
+      event.category = event.category || "";
+      event.fromCategory = event.fromCategory || "";
+      event.toCategory = event.toCategory || "";
+      event.note = event.note || "";
       event.amount = Number.isFinite(Number(event.amount)) ? Number(event.amount) : 0;
       event.createdAt = event.createdAt || fallbackTimestamp(event.date);
       event.updatedAt = event.updatedAt || event.createdAt;
     });
     month.debts?.forEach(debt => {
-      debt.person = shouldTranslateLegacyNames ? translateName(debt.person) : debt.person;
-      debt.note = translateNote(debt.note);
+      debt.person = debt.person || "";
+      debt.note = debt.note || "";
       debt.status = translateStatus(debt.status);
     });
   });
@@ -1128,6 +1127,28 @@ function laterMonthKeys(monthId = state.currentMonth) {
 
 function previousMonthKey(monthId) {
   return sortedMonthKeys().filter(key => key < monthId).pop() || null;
+}
+
+function categoryNamesMatch(a, b) {
+  return normalizedCategoryName(a) === normalizedCategoryName(b);
+}
+
+function categoryNameExistsInMonth(name, { monthId = state.currentMonth, ignoreId = null } = {}) {
+  const normalized = normalizedCategoryName(name);
+  if (!normalized) return false;
+  return (state.months[monthId]?.funds || []).some(fund =>
+    fund.id !== ignoreId && normalizedCategoryName(fund.name) === normalized
+  );
+}
+
+function previousCategoryFor(fund, monthId = state.currentMonth) {
+  const previousKey = previousMonthKey(monthId);
+  if (!previousKey || !fund) return null;
+  return (state.months[previousKey]?.funds || []).find(item => categoryNamesMatch(item.name, fund.name)) || null;
+}
+
+function canEditCategoryStartingBalance(fund, monthId = state.currentMonth) {
+  return !previousCategoryFor(fund, monthId);
 }
 
 function hasLaterMonths(monthId = state.currentMonth) {
@@ -1381,7 +1402,7 @@ function billingCycleLabel(cycle) {
 }
 
 function subscriptionMetaText(fund) {
-  if (!fund?.isSubscription) return "";
+  if (normalizeCategoryRole(fund?.role) !== "fixed" || !fund?.isSubscription) return "";
   const parts = [billingCycleLabel(fund.billingCycle)];
   const amount = Number(fund.expectedAmount || 0);
   if (amount > 0) parts.push(money(amount));
@@ -1500,7 +1521,7 @@ function roleAllocationTotal(month, role) {
 }
 
 function subscriptionInsights(month = currentMonth()) {
-  const subscriptions = month.funds.filter(fund => Boolean(fund.isSubscription));
+  const subscriptions = month.funds.filter(fund => normalizeCategoryRole(fund.role) === "fixed" && Boolean(fund.isSubscription));
   return subscriptions.reduce((result, fund) => {
     const amount = Number(fund.expectedAmount || 0);
     const cycle = normalizeBillingCycle(fund.billingCycle);
@@ -1662,6 +1683,7 @@ function renderStaticLanguage() {
   document.querySelector("#detailView .detail-stats .metric:nth-child(1) span").textContent = t("startingBalance");
   document.querySelector("#detailView .detail-stats .metric:nth-child(2) span").textContent = t("monthlyAllocation");
   document.querySelector("#detailView .detail-stats .metric:nth-child(3) span").textContent = t("spentInFund");
+  document.querySelector("#detailView .detail-stats .metric:nth-child(4) span").textContent = t("categoryRole");
   document.querySelector("#detailView .expense-panel h2").textContent = t("records");
   document.querySelector("#detailMoveBtn").textContent = t("move");
   document.querySelector("#detailAddExpenseBtn").textContent = t("logExpense");
@@ -2282,7 +2304,7 @@ function renderDetail() {
   els.detailRoleLabel.textContent = t("categoryRole");
   els.detailRoleValue.textContent = categoryRoleLabel(fund.role);
   els.detailSubscriptionMeta.textContent = subscriptionMetaText(fund);
-  els.detailSubscriptionMeta.hidden = !fund.isSubscription;
+  els.detailSubscriptionMeta.hidden = !subscriptionMetaText(fund);
   els.detailExpenseTable.innerHTML = records.length
     ? records.map(record => `
       <tr class="${record.editable ? "clickable-row" : ""}" ${record.editable ? `data-action="edit-expense" data-id="${record.id}" tabindex="0" aria-label="${escapeAttr(t("editRecord", fund.name, money(Math.abs(record.amount))))}"` : ""}>
@@ -2989,10 +3011,11 @@ function openDialog(mode, id = null, defaults = {}) {
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
-  const canDelete = ["expense", "project", "fund"].includes(mode) && Boolean(id) && !(mode === "project" && item?.status === "settled");
+  const canDelete = ["expense", "project", "fund", "categoryRole"].includes(mode) && Boolean(id) && !(mode === "project" && item?.status === "settled");
   els.deleteDialogBtn.hidden = !canDelete;
-  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : mode === "fund" ? t("delete") : t("deleteExpense");
+  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["fund", "categoryRole"].includes(mode) ? t("delete") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
+  updateCategoryFixedFields();
   if (!els.dialog.open) {
     lockBackgroundScroll();
     els.dialog.showModal();
@@ -3006,6 +3029,14 @@ function preventDialogInputFocus() {
     active.blur();
   }
   els.dialogTitle.focus({ preventScroll: true });
+}
+
+function updateCategoryFixedFields() {
+  if (dialogMode !== "categoryRole") return;
+  const fixedSettings = els.form.querySelector("[data-fixed-category-settings]");
+  const roleSelect = els.form.querySelector("[data-category-role-select]");
+  if (!fixedSettings || !roleSelect) return;
+  fixedSettings.hidden = normalizeCategoryRole(roleSelect.value) !== "fixed";
 }
 
 function fieldTemplates(mode, item) {
@@ -3027,27 +3058,45 @@ function fieldTemplates(mode, item) {
     const role = normalizeCategoryRole(item.role);
     const billingCycle = normalizeBillingCycle(item.billingCycle);
     const dueDay = item.dueDay === null || item.dueDay === undefined ? "" : item.dueDay;
+    const canEditStart = canEditCategoryStartingBalance(item);
+    const startingBalanceField = canEditStart
+      ? `
+        <label class="field">${t("startingBalance")}
+          <input name="startingBalance" type="text" inputmode="decimal" autocomplete="off" value="${escapeAttr(normalizeMoney(Number(item.start || 0)).toFixed(2))}" data-money-input>
+        </label>
+      `
+      : `
+        <section class="dialog-note">
+          <strong>${t("startingBalance")}</strong>
+          <span>${money(item.start || 0)}</span>
+          <small>${t("startingBalanceCarried")}</small>
+        </section>
+      `;
     return `
+      ${field(t("name"), "name", item.name || "", "text")}
+      ${startingBalanceField}
       <label class="field">${t("categoryRole")}
-        <select name="role">
+        <select name="role" data-category-role-select>
           ${CATEGORY_ROLES.map(value => `<option value="${value}" ${role === value ? "selected" : ""}>${categoryRoleLabel(value)}</option>`).join("")}
         </select>
       </label>
-      <label class="checkbox-field">
-        <input name="isSubscription" type="checkbox" ${item.isSubscription ? "checked" : ""}>
-        <span>${t("isSubscription")}</span>
-      </label>
-      <label class="field">${t("billingCycle")}
-        <select name="billingCycle">
-          ${BILLING_CYCLES.map(value => `<option value="${value}" ${billingCycle === value ? "selected" : ""}>${billingCycleLabel(value)}</option>`).join("")}
-        </select>
-      </label>
-      <label class="field">${t("expectedAmount")}
-        <input name="expectedAmount" type="text" inputmode="decimal" autocomplete="off" value="${escapeAttr(item.expectedAmount || "")}" data-money-input>
-      </label>
-      <label class="field">${t("dueDay")}
-        <input name="dueDay" type="text" inputmode="numeric" autocomplete="off" value="${escapeAttr(dueDay)}" placeholder="${escapeAttr(t("noDueDay"))}">
-      </label>
+      <section data-fixed-category-settings ${role === "fixed" ? "" : "hidden"}>
+        <label class="checkbox-field">
+          <input name="isSubscription" type="checkbox" ${item.isSubscription ? "checked" : ""}>
+          <span>${t("isSubscription")}</span>
+        </label>
+        <label class="field">${t("billingCycle")}
+          <select name="billingCycle">
+            ${BILLING_CYCLES.map(value => `<option value="${value}" ${billingCycle === value ? "selected" : ""}>${billingCycleLabel(value)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field">${t("expectedAmount")}
+          <input name="expectedAmount" type="text" inputmode="decimal" autocomplete="off" value="${escapeAttr(item.expectedAmount || "")}" data-money-input>
+        </label>
+        <label class="field">${t("dueDay")}
+          <input name="dueDay" type="text" inputmode="numeric" autocomplete="off" value="${escapeAttr(dueDay)}" placeholder="${escapeAttr(t("noDueDay"))}">
+        </label>
+      </section>
     `;
   }
 
@@ -3425,6 +3474,10 @@ function saveEntry(event) {
     return;
   }
   if (dialogMode === "fund" && !payload.name) return;
+  if (dialogMode === "fund" && categoryNameExistsInMonth(payload.name, { ignoreId: editingId })) {
+    alert(t("duplicateCategoryName"));
+    return;
+  }
 
   let affectsLaterMonthStarts = dialogMode === "expense";
   let fundRename = null;
@@ -3481,26 +3534,52 @@ function saveCategorySettings(data) {
   const fund = currentMonth().funds.find(item => item.id === editingId);
   if (!fund) return;
 
-  const expectedAmount = parseMoneyInput(data.expectedAmount);
-  if (String(data.expectedAmount || "").trim() && expectedAmount === null) {
-    alert(t("validAmount"));
-    return;
-  }
-  const dueDayText = String(data.dueDay || "").trim();
-  const dueDay = dueDayText ? Number(dueDayText) : null;
-  if (dueDay !== null && (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)) {
-    alert(t("validDueDay"));
+  const previousName = fund.name;
+  const nextName = String(data.name || "").trim();
+  if (!nextName) return;
+  if (categoryNameExistsInMonth(nextName, { ignoreId: editingId })) {
+    alert(t("duplicateCategoryName"));
     return;
   }
 
-  const categoryName = fund.name;
-  const metadata = {
-    role: normalizeCategoryRole(data.role),
-    isSubscription: data.isSubscription === "on",
-    billingCycle: normalizeBillingCycle(data.billingCycle),
-    expectedAmount: normalizeMoney(expectedAmount || 0),
-    dueDay
-  };
+  const canEditStart = canEditCategoryStartingBalance(fund);
+  const startingBalance = canEditStart ? parseMoneyInput(data.startingBalance) : null;
+  if (canEditStart && String(data.startingBalance || "").trim() && startingBalance === null) {
+    alert(t("validAmount"));
+    return;
+  }
+
+  const role = normalizeCategoryRole(data.role);
+  let fixedMetadata = null;
+  if (role === "fixed") {
+    const expectedAmount = parseMoneyInput(data.expectedAmount);
+    if (String(data.expectedAmount || "").trim() && expectedAmount === null) {
+      alert(t("validAmount"));
+      return;
+    }
+    const dueDayText = String(data.dueDay || "").trim();
+    const dueDay = dueDayText ? Number(dueDayText) : null;
+    if (dueDay !== null && (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)) {
+      alert(t("validDueDay"));
+      return;
+    }
+    fixedMetadata = {
+      isSubscription: data.isSubscription === "on",
+      billingCycle: normalizeBillingCycle(data.billingCycle),
+      expectedAmount: normalizeMoney(expectedAmount || 0),
+      dueDay
+    };
+  }
+
+  const previousStart = Number(fund.start || 0);
+  const nextStart = canEditStart ? normalizeMoney(startingBalance || 0) : previousStart;
+  const nameChanged = previousName !== nextName;
+  if (nameChanged) {
+    renameCategoryRecords(previousName, nextName);
+  }
+
+  const categoryName = nextName;
+  const metadata = { role, ...(fixedMetadata || {}) };
 
   sortedMonthKeys()
     .filter(key => key >= state.currentMonth)
@@ -3513,6 +3592,17 @@ function saveCategorySettings(data) {
         });
     });
 
+  const startChanged = canEditStart && previousStart !== nextStart;
+  if (startChanged) {
+    const updatedFund = currentMonth().funds.find(item => item.id === editingId);
+    if (updatedFund) {
+      updatedFund.start = nextStart;
+      updatedFund.updatedAt = nowStamp();
+    }
+  }
+  if (nameChanged || startChanged) {
+    cascadeLaterMonthStartsQuietly();
+  }
   markFinancialDirty();
   saveState();
   els.dialog.close();
@@ -3613,13 +3703,13 @@ function deleteCurrentDialogItem() {
     deleteCurrentProject();
     return;
   }
-  if (dialogMode === "fund") {
+  if (dialogMode === "fund" || dialogMode === "categoryRole") {
     deleteCurrentCategory();
   }
 }
 
 function deleteCurrentCategory() {
-  if (dialogMode !== "fund" || !editingId) return;
+  if (!["fund", "categoryRole"].includes(dialogMode) || !editingId) return;
 
   const fund = currentMonth().funds.find(item => item.id === editingId);
   if (!fund) return;
