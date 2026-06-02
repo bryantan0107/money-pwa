@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.02.1";
+const APP_VERSION = "2026.06.02.2";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
 const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
@@ -64,6 +64,13 @@ const I18N = {
     totalAvailable: "Total Available",
     spendable: "Spendable",
     fixedReserved: "Fixed Reserved",
+    fixedPaidSummary: (paid, total) => `${paid} / ${total} paid`,
+    notRecorded: "Not recorded",
+    partiallyPaid: "Partial",
+    paid: "Paid",
+    markPaid: "Mark paid",
+    markFixedBillPaid: "Mark as paid",
+    expected: "Expected",
     saved: "Saved",
     reserved: "Reserved",
     allocatedThisMonth: "Allocated this month",
@@ -279,6 +286,13 @@ const I18N = {
     totalAvailable: "总可用",
     spendable: "可消费",
     fixedReserved: "固定预留",
+    fixedPaidSummary: (paid, total) => `已支付 ${paid} / ${total}`,
+    notRecorded: "未记录扣款",
+    partiallyPaid: "部分支付",
+    paid: "已支付",
+    markPaid: "标记已支付",
+    markFixedBillPaid: "标记已支付",
+    expected: "预计",
     saved: "已储蓄",
     reserved: "预留",
     allocatedThisMonth: "本月分配",
@@ -1298,6 +1312,26 @@ function expenseTotalFor(category, month = currentMonth()) {
     .reduce((total, expense) => total + Number(expense.amount || 0), 0);
 }
 
+function fixedBillStatus(fund, month = currentMonth()) {
+  const paidAmount = expenseTotalFor(fund.name, month);
+  const expectedAmount = Number(fund.expectedAmount || 0);
+  const hasFixedBillExpense = (month.expenses || []).some(expense => expense.category === fund.name && expense.source === "fixed-bill");
+  let status = "not-recorded";
+  if (expectedAmount > 0) {
+    if (paidAmount >= expectedAmount) status = "paid";
+    else if (paidAmount > 0) status = "partial";
+  } else if (hasFixedBillExpense || paidAmount > 0) {
+    status = "paid";
+  }
+  return { status, paidAmount, expectedAmount };
+}
+
+function fixedBillStatusLabel(status) {
+  if (status === "paid") return t("paid");
+  if (status === "partial") return t("partiallyPaid");
+  return t("notRecorded");
+}
+
 function balanceFor(fund, month = currentMonth()) {
   return Number(fund.start || 0) + Number(fund.allocation || 0) - expenseTotalFor(fund.name, month);
 }
@@ -1948,7 +1982,28 @@ function renderFunds() {
   els.fundSortSelect.value = state.fundSort || DEFAULT_FUND_SORT;
   els.fundSearchResults.hidden = true;
 
+  function renderFixedSummary(cards) {
+    if (availableRoleFilter !== "fixed") return "";
+    const paidCount = cards.filter(item => fixedBillStatus(item.fund, month).status === "paid").length;
+    const fixedReserved = cards.reduce((total, item) => total + item.balance, 0);
+    return `
+      <section class="fixed-tab-summary" aria-label="${escapeAttr(t("fixedReserved"))}">
+        <article>
+          <span>${t("fixedReserved")}</span>
+          <strong class="${fixedReserved < 0 ? "is-negative" : ""}">${money(fixedReserved)}</strong>
+        </article>
+        <article>
+          <span>${t("paid")}</span>
+          <strong>${t("fixedPaidSummary", paidCount, cards.length)}</strong>
+        </article>
+      </section>
+    `;
+  }
+
   function renderFundCard({ fund, spent, balance, progress, health, isDepleted, role }) {
+    if (availableRoleFilter === "fixed" && role === "fixed") {
+      return renderFixedBillCard({ fund, spent, balance, isDepleted });
+    }
     const secondaryText = role === "fixed" && fund.isSubscription
       ? subscriptionMetaText(fund)
       : `${t("spent")} ${money(spent)}`;
@@ -1974,6 +2029,46 @@ function renderFunds() {
         <div class="fund-foot">
           <span>${escapeHtml(footLeft)}</span>
           <span>${escapeHtml(footRight)}</span>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderFixedBillCard({ fund, spent, balance, isDepleted }) {
+    const bill = fixedBillStatus(fund, month);
+    const meta = [
+      fund.isSubscription ? t("subscription") : "",
+      fund.isSubscription ? billingCycleLabel(fund.billingCycle) : "",
+      fund.dueDay ? `${t("dueDay")} ${fund.dueDay}` : ""
+    ].filter(Boolean).join(" · ");
+    const expected = bill.expectedAmount > 0
+      ? `<span>${t("expected")} ${money(bill.expectedAmount)}</span>`
+      : "";
+    const action = bill.status === "paid"
+      ? ""
+      : `<button type="button" class="fixed-paid-btn" data-action="mark-fixed-paid" data-id="${fund.id}">${t("markPaid")}</button>`;
+    return `
+      <article class="fund-card fixed-bill-card status-${bill.status} ${isDepleted ? "is-depleted" : ""} ${fund.pinned ? "is-pinned" : ""}" data-id="${fund.id}" data-fund-name="${escapeAttr(fund.name)}" data-action="view-fund" draggable="true">
+        <div class="fixed-bill-main">
+          <div>
+            <div class="fixed-bill-title">
+              <span class="name">${escapeHtml(fund.name)}</span>
+              <button type="button" class="pin-btn" data-action="toggle-fund-pin" data-id="${fund.id}" aria-pressed="${fund.pinned ? "true" : "false"}" aria-label="${fund.pinned ? t("unpin") : t("pin")} ${escapeAttr(fund.name)}">${fund.pinned ? "★" : "☆"}</button>
+            </div>
+            <div class="fixed-bill-meta">
+              ${expected}
+              <span>${t("spent")} ${money(spent)}</span>
+              ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
+            </div>
+          </div>
+          <div class="fixed-bill-side">
+            <span class="bill-status-pill status-${bill.status}">${fixedBillStatusLabel(bill.status)}</span>
+            <div class="fixed-bill-amount-row">
+              ${action}
+              <strong class="amount ${balance < 0 ? "is-negative" : ""}">${money(balance)}</strong>
+            </div>
+            <small>${t("reserved")}</small>
+          </div>
         </div>
       </article>
     `;
@@ -2026,7 +2121,7 @@ function renderFunds() {
 
   const listMarkup = availableRoleFilter === "all"
     ? ["spending", "fixed", "savings"].map(renderRoleGroup).join("")
-    : renderSortedCardGroup(allCards, true, availableRoleFilter);
+    : `${renderFixedSummary(allCards)}${renderSortedCardGroup(allCards, true, availableRoleFilter)}`;
 
   els.fundList.innerHTML = listMarkup.trim()
     ? listMarkup
@@ -2655,6 +2750,7 @@ document.body.addEventListener("click", event => {
   if (action === "open-allocation") openDialog("allocation");
   if (action === "open-transfer") openDialog("transfer");
   if (action === "apply-quick-allocation") applyQuickAllocationToEditor();
+  if (action === "mark-fixed-paid") openDialog("fixedBill", id);
   if (action === "select-fund-filter") {
     els.fundSearchInput.value = button.dataset.name;
     els.fundSearchResults.hidden = true;
@@ -2874,7 +2970,8 @@ function openDialog(mode, id = null, defaults = {}) {
     allocation: month.funds,
     quickAllocate: month.funds,
     transfer: month.funds,
-    categoryRole: month.funds
+    categoryRole: month.funds,
+    fixedBill: month.funds
   }[mode];
   const item = id ? source.find(entry => entry.id === id) : defaults;
 
@@ -2887,7 +2984,8 @@ function openDialog(mode, id = null, defaults = {}) {
     allocation: t("allocateIncome"),
     quickAllocate: t("allocateIncome"),
     transfer: t("moveFunds"),
-    categoryRole: t("editCategorySettings")
+    categoryRole: t("editCategorySettings"),
+    fixedBill: t("markFixedBillPaid")
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
@@ -2950,6 +3048,20 @@ function fieldTemplates(mode, item) {
       <label class="field">${t("dueDay")}
         <input name="dueDay" type="text" inputmode="numeric" autocomplete="off" value="${escapeAttr(dueDay)}" placeholder="${escapeAttr(t("noDueDay"))}">
       </label>
+    `;
+  }
+
+  if (mode === "fixedBill") {
+    const balance = balanceFor(item);
+    const defaultAmount = Number(item.expectedAmount || 0) || Math.max(0, balance) || Number(item.allocation || 0);
+    return `
+      <section class="dialog-note">
+        <strong>${escapeHtml(item.name || "")}</strong>
+        <span>${t("reserved")} ${money(balance)}</span>
+      </section>
+      ${field(t("date"), "date", defaultEntryDateForCurrentMonth(), "date")}
+      ${field(t("note"), "note", item.name || "", "text")}
+      ${field(t("amount"), "amount", defaultAmount ? normalizeMoney(defaultAmount).toFixed(2) : "", "number")}
     `;
   }
 
@@ -3284,6 +3396,11 @@ function saveEntry(event) {
     return;
   }
 
+  if (dialogMode === "fixedBill") {
+    saveFixedBillExpense(data);
+    return;
+  }
+
   if (dialogMode === "project") {
     saveProject(data);
     return;
@@ -3396,6 +3513,43 @@ function saveCategorySettings(data) {
         });
     });
 
+  markFinancialDirty();
+  saveState();
+  els.dialog.close();
+  render();
+}
+
+function saveFixedBillExpense(data) {
+  const month = currentMonth();
+  const fund = month.funds.find(item => item.id === editingId);
+  if (!fund) return;
+
+  const amount = parseMoneyInput(data.amount);
+  if (amount === null || amount <= 0) {
+    alert(t("validAmount"));
+    return;
+  }
+
+  const stamp = nowStamp();
+  month.expenses.push({
+    id: crypto.randomUUID(),
+    date: data.date || defaultEntryDateForCurrentMonth(),
+    category: fund.name,
+    note: data.note || fund.name,
+    amount,
+    source: "fixed-bill",
+    createdAt: stamp,
+    updatedAt: stamp
+  });
+  fund.updatedAt = stamp;
+  addCategoryEvent({
+    category: fund.name,
+    type: "expense",
+    amount: -amount,
+    note: data.note || fund.name,
+    date: data.date || defaultEntryDateForCurrentMonth()
+  });
+  cascadeLaterMonthStartsQuietly();
   markFinancialDirty();
   saveState();
   els.dialog.close();

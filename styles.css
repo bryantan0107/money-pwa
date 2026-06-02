@@ -1038,6 +1038,7 @@ label.field.compact {
 .funds-panel .panel-title {
   align-items: stretch;
   flex-direction: column;
+  padding-bottom: 12px;
 }
 
 .fund-primary-actions {
@@ -1067,7 +1068,7 @@ label.field.compact {
 
 .fund-tools {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
   width: 100%;
   min-width: 0;
@@ -1082,7 +1083,7 @@ label.field.compact {
 
 .search-field input {
   width: 100%;
-  min-height: 34px;
+  min-height: 38px;
   border-radius: 8px;
   background: rgba(242, 242, 247, 0.82);
   padding: 0 12px;
@@ -1101,11 +1102,11 @@ label.field.compact {
 .sort-field {
   position: relative;
   display: grid;
-  gap: 4px;
   min-width: 104px;
 }
 
 .sort-label {
+  display: none;
   color: var(--muted);
   font-size: 10px;
   font-weight: 600;
@@ -1114,7 +1115,7 @@ label.field.compact {
 
 .sort-display {
   min-width: 104px;
-  min-height: 34px;
+  min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background-color: rgba(255, 255, 255, 0.86);
@@ -1214,7 +1215,7 @@ label.field.compact {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  padding: 14px;
+  padding: 8px 14px 14px;
 }
 
 .fund-role-filter strong.is-negative,
@@ -1970,6 +1971,140 @@ label.field.compact {
 
 .fund-card.is-depleted .amount {
   color: var(--muted);
+}
+
+.fixed-tab-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 12px 4px;
+}
+
+.fixed-tab-summary article {
+  display: grid;
+  gap: 1px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.fixed-tab-summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fixed-tab-summary strong {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fixed-tab-summary strong.is-negative {
+  color: var(--red);
+}
+
+.fixed-bill-card {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  min-height: 0;
+  padding: 13px 16px;
+}
+
+.fixed-bill-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.fixed-bill-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fixed-bill-title .name {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.fixed-bill-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.fixed-bill-side {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.fixed-bill-side small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.bill-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.12);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bill-status-pill.status-paid {
+  color: var(--green);
+  background: rgba(36, 138, 61, 0.12);
+}
+
+.bill-status-pill.status-partial {
+  color: var(--orange);
+  background: rgba(191, 90, 0, 0.12);
+}
+
+.bill-status-pill.status-not-recorded {
+  color: var(--muted);
+  background: rgba(142, 142, 147, 0.12);
+}
+
+.fixed-bill-amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 22px;
+}
+
+.fixed-paid-btn {
+  background: var(--blue);
+  color: #fff;
+  border-color: transparent;
+  min-height: 32px;
+  padding: 0 13px;
+  border-radius: 8px;
+}
+
+.fixed-paid-btn:hover {
+  background: #005bbd;
 }
 
 .pin-btn {
@@ -2891,7 +3026,7 @@ menu .dialog-delete-btn {
   .fund-list {
     grid-template-columns: 1fr;
     gap: 8px;
-    padding: 8px;
+    padding: 6px 8px 8px;
   }
 
   .fund-group-label {
@@ -2908,6 +3043,35 @@ menu .dialog-delete-btn {
     gap: 9px 10px;
     min-height: 0;
     padding: 13px;
+  }
+
+  .fixed-tab-summary {
+    margin: 0 8px 4px;
+  }
+
+  .fixed-bill-card {
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .fixed-bill-main {
+    gap: 10px;
+  }
+
+  .fixed-bill-amount-row {
+    gap: 14px;
+  }
+
+  .fixed-paid-btn {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .fixed-bill-side .amount {
+    font-size: 23px;
   }
 
   .fund-list.is-reordering .fund-card {
