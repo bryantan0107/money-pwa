@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.02.3";
+const APP_VERSION = "2026.06.02.4";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
 const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
@@ -2334,7 +2334,7 @@ function categoryRecordsFor(fund) {
   }
 
   (month.categoryEvents || [])
-    .filter(event => event.category === fund.name)
+    .filter(event => event.category === fund.name && event.type !== "expense")
     .forEach(event => {
       records.push({
         ...event,
@@ -3632,13 +3632,6 @@ function saveFixedBillExpense(data) {
     updatedAt: stamp
   });
   fund.updatedAt = stamp;
-  addCategoryEvent({
-    category: fund.name,
-    type: "expense",
-    amount: -amount,
-    note: data.note || fund.name,
-    date: data.date || defaultEntryDateForCurrentMonth()
-  });
   cascadeLaterMonthStartsQuietly();
   markFinancialDirty();
   saveState();
