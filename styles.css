@@ -1824,6 +1824,27 @@ label.field.compact {
   margin-top: 3px;
 }
 
+.settings-item small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: min(360px, 52vw);
+}
+
+.settings-actions input {
+  width: min(210px, 100%);
+}
+
 .settings-item.passive span {
   color: var(--muted);
   font-size: 20px;

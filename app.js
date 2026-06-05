@@ -7,7 +7,9 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.02.4";
+const APP_VERSION = "2026.06.05.1";
+const SYNC_TABLE = "sync_states";
+const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
 const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
@@ -140,6 +142,23 @@ const I18N = {
     backupStatusDirty: "Financial changes need a new backup.",
     lastBackup: "Last backup",
     neverBackedUp: "Never backed up",
+    cloudSync: "Cloud Sync",
+    cloudSyncText: "Sync this device with Supabase.",
+    cloudSyncNotConfigured: "Add your Supabase URL and anon key in sync-config.js.",
+    cloudSyncSignedOut: "Sign in to sync across devices.",
+    cloudSyncSignedIn: email => `Signed in as ${email}`,
+    cloudSyncLastSynced: date => `Last synced ${date}`,
+    cloudSyncChecking: "Checking cloud data…",
+    cloudSyncSaved: "Synced",
+    cloudSyncMagicLink: "Check your email for the sign-in link.",
+    cloudSyncError: "Cloud sync failed.",
+    cloudSyncConflict: "Cloud data and this device both changed. OK uses cloud data. Cancel keeps this device and uploads it.",
+    cloudSyncUseCloud: "Cloud data restored",
+    cloudSyncUseLocal: "This device kept",
+    signIn: "Sign in",
+    signOut: "Sign out",
+    syncNow: "Sync now",
+    email: "Email",
     restore: "Restore",
     restoreText: "Import a backup file from this app.",
     currency: "Currency",
@@ -364,6 +383,23 @@ const I18N = {
     backupStatusDirty: "有财务修改需要重新备份。",
     lastBackup: "最近备份",
     neverBackedUp: "还没有备份",
+    cloudSync: "云同步",
+    cloudSyncText: "通过 Supabase 同步这台设备。",
+    cloudSyncNotConfigured: "请先在 sync-config.js 填入 Supabase URL 和 anon key。",
+    cloudSyncSignedOut: "登录后即可跨设备同步。",
+    cloudSyncSignedIn: email => `已登录：${email}`,
+    cloudSyncLastSynced: date => `上次同步 ${date}`,
+    cloudSyncChecking: "正在检查云端数据…",
+    cloudSyncSaved: "已同步",
+    cloudSyncMagicLink: "请检查邮箱中的登录链接。",
+    cloudSyncError: "云同步失败。",
+    cloudSyncConflict: "云端数据和这台设备都发生了变化。点确认使用云端，点取消保留本机并上传。",
+    cloudSyncUseCloud: "已恢复云端数据",
+    cloudSyncUseLocal: "已保留本机数据",
+    signIn: "登录",
+    signOut: "退出登录",
+    syncNow: "立即同步",
+    email: "Email",
     restore: "恢复",
     restoreText: "从这个 app 导入备份文件。",
     currency: "货币",
@@ -644,6 +680,11 @@ let touchFundDrag = null;
 let suppressFundClick = false;
 let availableRoleFilter = "spending";
 let allocationRowEdit = null;
+let supabaseClient = null;
+let syncSession = null;
+let syncTimer = null;
+let applyingRemoteState = false;
+let syncInitialized = false;
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -727,6 +768,13 @@ const els = {
   checkUpdatesBtn: document.querySelector("#checkUpdatesBtn"),
   settingsBackupBtn: document.querySelector("#settingsBackupBtn"),
   settingsImportInput: document.querySelector("#settingsImportInput"),
+  cloudSyncTitle: document.querySelector("#cloudSyncTitle"),
+  cloudSyncText: document.querySelector("#cloudSyncText"),
+  cloudSyncStatus: document.querySelector("#cloudSyncStatus"),
+  syncEmailInput: document.querySelector("#syncEmailInput"),
+  syncSignInBtn: document.querySelector("#syncSignInBtn"),
+  syncNowBtn: document.querySelector("#syncNowBtn"),
+  syncSignOutBtn: document.querySelector("#syncSignOutBtn"),
   backupStatusTitle: document.querySelector("#backupStatusTitle"),
   backupStatusText: document.querySelector("#backupStatusText"),
   backupStatusValue: document.querySelector("#backupStatusValue"),
@@ -846,6 +894,9 @@ els.languageSelect.addEventListener("change", event => {
 });
 els.settingsBackupBtn.addEventListener("click", exportData);
 els.settingsImportInput.addEventListener("change", importData);
+els.syncSignInBtn.addEventListener("click", signInToCloudSync);
+els.syncNowBtn.addEventListener("click", () => syncNow({ manual: true }));
+els.syncSignOutBtn.addEventListener("click", signOutOfCloudSync);
 els.backupNowBtn.addEventListener("click", exportData);
 els.dismissBackupBtn.addEventListener("click", dismissBackupReminder);
 document.querySelector("#cancelDialogBtn").addEventListener("click", closeEntryDialog);
@@ -956,6 +1007,11 @@ function normalizeStateLanguage(rawState) {
   if (!rawState.language) rawState.language = DEFAULT_LANGUAGE;
   rawState.backupDirty = Boolean(rawState.backupDirty);
   rawState.lastBackupAt = rawState.lastBackupAt || localStorage.getItem(LAST_BACKUP_KEY) || null;
+  rawState.updatedAt = rawState.updatedAt || new Date().toISOString();
+  rawState.cloudSync = {
+    lastSyncedAt: rawState.cloudSync?.lastSyncedAt || null,
+    lastRemoteUpdatedAt: rawState.cloudSync?.lastRemoteUpdatedAt || null
+  };
   if (!Array.isArray(rawState.projects)) rawState.projects = [];
   rawState.dataVersion = DATA_VERSION;
   rawState.languageNormalized = true;
@@ -1095,8 +1151,15 @@ function translateStatus(value) {
   return ENGLISH_STATUS_MAP[value] || value;
 }
 
-function saveState() {
+function saveState(options = {}) {
+  const touch = options.touch !== false;
+  if (touch && !applyingRemoteState) {
+    state.updatedAt = new Date().toISOString();
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (options.sync !== false && !applyingRemoteState) {
+    scheduleCloudSync();
+  }
 }
 
 function markFinancialDirty() {
@@ -1569,6 +1632,7 @@ function render() {
   renderDetailSortLabels();
   renderBackupReminder();
   renderBackupStatus();
+  renderCloudSyncStatus();
   const inDetail = Boolean(selectedFundId) || showingAllocationDetail || Boolean(selectedProjectId);
   els.dashboardView.hidden = inDetail || activeTab !== "home";
   els.recordsView.hidden = inDetail || activeTab !== "records";
@@ -1647,11 +1711,17 @@ function renderStaticLanguage() {
   document.querySelector(".restore-action").childNodes[0].textContent = t("restore");
   document.querySelector("#backupSettingTitle").textContent = t("backup");
   document.querySelector("#backupSettingText").textContent = t("backupText");
+  els.cloudSyncTitle.textContent = t("cloudSync");
+  els.cloudSyncText.textContent = t("cloudSyncText");
+  els.syncEmailInput.placeholder = t("email");
+  els.syncSignInBtn.textContent = syncSession ? t("syncNow") : t("signIn");
+  els.syncNowBtn.textContent = t("syncNow");
+  els.syncSignOutBtn.textContent = t("signOut");
   els.backupStatusTitle.textContent = t("backupStatus");
-  document.querySelector(".settings-item:nth-child(3) strong").textContent = t("restore");
-  document.querySelector(".settings-item:nth-child(3) p").textContent = t("restoreText");
-  document.querySelector(".settings-item:nth-child(4) strong").textContent = t("currency");
-  document.querySelector(".settings-item:nth-child(4) p").textContent = t("currencyText");
+  document.querySelector("#restoreSettingTitle").textContent = t("restore");
+  document.querySelector("#restoreSettingText").textContent = t("restoreText");
+  document.querySelector("#currencySettingTitle").textContent = t("currency");
+  document.querySelector("#currencySettingText").textContent = t("currencyText");
   document.querySelector("#languageSettingTitle").textContent = t("language");
   document.querySelector("#languageSettingText").textContent = t("languageText");
   document.querySelector("#updatesSettingTitle").textContent = t("updates");
@@ -4485,6 +4555,269 @@ function importData(event) {
   reader.readAsText(file);
 }
 
+function syncConfig() {
+  const config = window.MONEY_SYNC_CONFIG || {};
+  return {
+    supabaseUrl: String(config.supabaseUrl || "").trim(),
+    supabaseAnonKey: String(config.supabaseAnonKey || "").trim()
+  };
+}
+
+function isCloudSyncConfigured() {
+  const config = syncConfig();
+  return Boolean(config.supabaseUrl && config.supabaseAnonKey);
+}
+
+function getDeviceId() {
+  const key = "monthly-money-manager-device-id";
+  let deviceId = localStorage.getItem(key);
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem(key, deviceId);
+  }
+  return deviceId;
+}
+
+function renderCloudSyncStatus(message = "") {
+  if (!els.cloudSyncStatus) return;
+  const configured = isCloudSyncConfigured();
+  els.syncEmailInput.hidden = !configured || Boolean(syncSession);
+  els.syncNowBtn.hidden = !configured || !syncSession;
+  els.syncSignOutBtn.hidden = !configured || !syncSession;
+  els.syncSignInBtn.hidden = !configured;
+  els.syncSignInBtn.textContent = syncSession ? t("syncNow") : t("signIn");
+  els.syncNowBtn.textContent = t("syncNow");
+  els.syncSignOutBtn.textContent = t("signOut");
+
+  if (!configured) {
+    els.cloudSyncStatus.textContent = t("cloudSyncNotConfigured");
+    return;
+  }
+  if (message) {
+    els.cloudSyncStatus.textContent = message;
+    return;
+  }
+  if (!syncSession) {
+    els.cloudSyncStatus.textContent = t("cloudSyncSignedOut");
+    return;
+  }
+  const lastSynced = state.cloudSync?.lastSyncedAt;
+  els.cloudSyncStatus.textContent = lastSynced
+    ? t("cloudSyncLastSynced", formatShortDate(lastSynced.slice(0, 10)))
+    : t("cloudSyncSignedIn", syncSession.user?.email || "");
+}
+
+function scheduleCloudSync() {
+  if (applyingRemoteState || !syncInitialized || !syncSession || !isCloudSyncConfigured()) return;
+  window.clearTimeout(syncTimer);
+  syncTimer = window.setTimeout(() => {
+    syncNow({ manual: false });
+  }, SYNC_DEBOUNCE_MS);
+}
+
+function localChangedAfterLastSync() {
+  const lastSyncedAt = Date.parse(state.cloudSync?.lastSyncedAt || "");
+  const updatedAt = Date.parse(state.updatedAt || "");
+  if (!lastSyncedAt || !updatedAt) return true;
+  return updatedAt > lastSyncedAt + 1000;
+}
+
+async function initCloudSync() {
+  if (!isCloudSyncConfigured() || !window.supabase?.createClient) {
+    syncInitialized = true;
+    renderCloudSyncStatus();
+    return;
+  }
+
+  const config = syncConfig();
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+
+  const { data } = await supabaseClient.auth.getSession();
+  syncSession = data?.session || null;
+  syncInitialized = true;
+  renderCloudSyncStatus();
+  if (syncSession) syncNow({ manual: false });
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    syncSession = session || null;
+    renderCloudSyncStatus();
+    if (event === "SIGNED_IN" && syncSession) {
+      syncNow({ manual: false });
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && syncSession) syncNow({ manual: false });
+  });
+}
+
+async function signInToCloudSync() {
+  if (!isCloudSyncConfigured()) {
+    showToast(t("cloudSyncNotConfigured"));
+    renderCloudSyncStatus();
+    return;
+  }
+  if (!supabaseClient) {
+    await initCloudSync();
+  }
+  if (syncSession) {
+    syncNow({ manual: true });
+    return;
+  }
+  if (els.syncEmailInput.hidden) {
+    els.syncEmailInput.hidden = false;
+    els.syncEmailInput.focus();
+    return;
+  }
+  const email = els.syncEmailInput.value.trim();
+  if (!email) {
+    els.syncEmailInput.focus();
+    return;
+  }
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+  const { error } = await supabaseClient.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: redirectTo }
+  });
+  if (error) {
+    showToast(t("cloudSyncError"));
+    return;
+  }
+  showToast(t("cloudSyncMagicLink"));
+  renderCloudSyncStatus(t("cloudSyncMagicLink"));
+}
+
+async function signOutOfCloudSync() {
+  if (!supabaseClient) return;
+  await supabaseClient.auth.signOut();
+  syncSession = null;
+  renderCloudSyncStatus();
+}
+
+async function fetchRemoteSyncState() {
+  if (!supabaseClient || !syncSession) return null;
+  const { data, error } = await supabaseClient
+    .from(SYNC_TABLE)
+    .select("data_json, updated_at, device_id, app_version")
+    .eq("user_id", syncSession.user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+async function uploadLocalSyncState() {
+  if (!supabaseClient || !syncSession) return;
+  const remoteUpdatedAt = new Date().toISOString();
+  const payload = structuredClone(state);
+  const { error } = await supabaseClient
+    .from(SYNC_TABLE)
+    .upsert({
+      user_id: syncSession.user.id,
+      data_json: payload,
+      updated_at: remoteUpdatedAt,
+      device_id: getDeviceId(),
+      app_version: APP_VERSION
+    });
+  if (error) throw error;
+  state.cloudSync = {
+    lastSyncedAt: remoteUpdatedAt,
+    lastRemoteUpdatedAt: remoteUpdatedAt
+  };
+  saveState({ touch: false, sync: false });
+  renderCloudSyncStatus();
+}
+
+function applyRemoteSyncState(remote) {
+  if (!remote?.data_json) return;
+  applyingRemoteState = true;
+  try {
+    state = normalizeStateLanguage(structuredClone(remote.data_json));
+    state.cloudSync = {
+      lastSyncedAt: new Date().toISOString(),
+      lastRemoteUpdatedAt: remote.updated_at || new Date().toISOString()
+    };
+    saveState({ touch: false, sync: false });
+  } finally {
+    applyingRemoteState = false;
+  }
+  render();
+}
+
+async function syncNow({ manual = false } = {}) {
+  if (!isCloudSyncConfigured()) {
+    if (manual) showToast(t("cloudSyncNotConfigured"));
+    renderCloudSyncStatus();
+    return;
+  }
+  if (!supabaseClient) await initCloudSync();
+  if (!syncSession) {
+    if (manual) showToast(t("cloudSyncSignedOut"));
+    renderCloudSyncStatus();
+    return;
+  }
+
+  if (manual) {
+    showToast(t("cloudSyncChecking"));
+    renderCloudSyncStatus(t("cloudSyncChecking"));
+  }
+
+  try {
+    const remote = await fetchRemoteSyncState();
+    if (!remote) {
+      await uploadLocalSyncState();
+      if (manual) showToast(t("cloudSyncSaved"));
+      return;
+    }
+
+    const remoteUpdatedAt = Date.parse(remote.updated_at || "");
+    const lastRemoteSeen = Date.parse(state.cloudSync?.lastRemoteUpdatedAt || "");
+    const remoteChanged = remoteUpdatedAt && (!lastRemoteSeen || remoteUpdatedAt > lastRemoteSeen + 1000);
+    const localChanged = localChangedAfterLastSync();
+
+    if (remoteChanged && localChanged) {
+      const useCloud = window.confirm(t("cloudSyncConflict"));
+      if (useCloud) {
+        applyRemoteSyncState(remote);
+        showToast(t("cloudSyncUseCloud"));
+      } else {
+        await uploadLocalSyncState();
+        showToast(t("cloudSyncUseLocal"));
+      }
+      return;
+    }
+
+    if (remoteChanged && !localChanged) {
+      applyRemoteSyncState(remote);
+      if (manual) showToast(t("cloudSyncUseCloud"));
+      return;
+    }
+
+    if (localChanged) {
+      await uploadLocalSyncState();
+      if (manual) showToast(t("cloudSyncSaved"));
+      return;
+    }
+
+    state.cloudSync = {
+      lastSyncedAt: new Date().toISOString(),
+      lastRemoteUpdatedAt: remote.updated_at || state.cloudSync?.lastRemoteUpdatedAt || null
+    };
+    saveState({ touch: false, sync: false });
+    renderCloudSyncStatus();
+    if (manual) showToast(t("cloudSyncSaved"));
+  } catch (error) {
+    console.warn("Cloud sync failed", error);
+    if (manual) showToast(t("cloudSyncError"));
+    renderCloudSyncStatus(t("cloudSyncError"));
+  }
+}
+
 async function checkForUpdates() {
   if (!("serviceWorker" in navigator)) {
     showToast(t("upToDate"));
@@ -4624,3 +4957,4 @@ function registerServiceWorker() {
 
 render();
 registerServiceWorker();
+initCloudSync();

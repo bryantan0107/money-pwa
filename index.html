@@ -179,6 +179,19 @@
                 </div>
                 <button id="settingsBackupBtn" type="button">Back Up</button>
               </article>
+              <article class="settings-item sync-settings-item">
+                <div>
+                  <strong id="cloudSyncTitle">Cloud Sync</strong>
+                  <p id="cloudSyncText">Sync this device with Supabase.</p>
+                  <small id="cloudSyncStatus">Not configured</small>
+                </div>
+                <div class="settings-actions">
+                  <input id="syncEmailInput" type="email" autocomplete="email" placeholder="Email" hidden>
+                  <button id="syncSignInBtn" type="button">Sign in</button>
+                  <button id="syncNowBtn" type="button">Sync now</button>
+                  <button id="syncSignOutBtn" type="button" hidden>Sign out</button>
+                </div>
+              </article>
               <article class="settings-item passive">
                 <div>
                   <strong id="backupStatusTitle">Backup Status</strong>
@@ -188,8 +201,8 @@
               </article>
               <article class="settings-item">
                 <div>
-                  <strong>Restore</strong>
-                  <p>Import a backup file from this app.</p>
+                  <strong id="restoreSettingTitle">Restore</strong>
+                  <p id="restoreSettingText">Import a backup file from this app.</p>
                 </div>
                 <label class="restore-action">
                   Restore
@@ -198,8 +211,8 @@
               </article>
               <article class="settings-item passive">
                 <div>
-                  <strong>Currency</strong>
-                  <p>Euro is the current currency.</p>
+                  <strong id="currencySettingTitle">Currency</strong>
+                  <p id="currencySettingText">Euro is the current currency.</p>
                 </div>
                 <span>€</span>
               </article>
@@ -421,6 +434,8 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=fixed_bugs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="sync-config.js?v=cloud-sync-1"></script>
+    <script src="app.js?v=cloud-sync-1"></script>
   </body>
 </html>
