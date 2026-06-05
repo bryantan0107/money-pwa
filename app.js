@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.05.2";
+const APP_VERSION = "2026.06.05.3";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
@@ -4627,6 +4627,11 @@ function renderCloudSyncStatus(message = "") {
     : t("cloudSyncSignedIn", syncSession.user?.email || "");
 }
 
+function cloudSyncErrorMessage(error) {
+  const detail = error?.message || error?.error_description || "";
+  return detail ? `${t("cloudSyncError")} ${detail}` : t("cloudSyncError");
+}
+
 function scheduleCloudSync() {
   if (applyingRemoteState || !syncInitialized || !syncSession || !isCloudSyncConfigured()) return;
   window.clearTimeout(syncTimer);
@@ -4696,12 +4701,18 @@ async function signInToCloudSync() {
     els.syncEmailInput.focus();
     return;
   }
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
   const { error } = await supabaseClient.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true }
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: redirectTo
+    }
   });
   if (error) {
-    showToast(t("cloudSyncError"));
+    const message = cloudSyncErrorMessage(error);
+    showToast(message);
+    renderCloudSyncStatus(message);
     return;
   }
   pendingSyncEmail = email;
@@ -4736,8 +4747,9 @@ async function verifyCloudSyncCode() {
     type: "email"
   });
   if (error) {
-    showToast(t("cloudSyncInvalidCode"));
-    renderCloudSyncStatus(t("cloudSyncInvalidCode"));
+    const message = error?.message ? `${t("cloudSyncInvalidCode")} ${error.message}` : t("cloudSyncInvalidCode");
+    showToast(message);
+    renderCloudSyncStatus(message);
     els.syncCodeInput.focus();
     return;
   }
