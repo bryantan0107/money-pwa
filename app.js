@@ -11,10 +11,13 @@ const APP_VERSION = "2026.06.05.3";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
+const NECESSITIES = ["need", "want"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
 const FIXED_ROLE_SEEDS = new Set(["rent", "phone", "youtube music", "apple storage", "gym"]);
 const SAVINGS_ROLE_SEEDS = new Set(["savings", "investment fund", "emergency fund"]);
 const SUBSCRIPTION_SEEDS = new Set(["youtube music", "apple storage", "phone", "gym"]);
+const NEED_NECESSITY_SEEDS = new Set(["rent", "groceries", "伙食", "房租"]);
+const WANT_NECESSITY_SEEDS = new Set(["youtube music", "spotify", "netflix", "apple storage", "gym"]);
 const I18N = {
   en: {
     appSubtitle: (month, funds, expenses) => `${month}, ${funds} categories, ${expenses} expenses`,
@@ -33,9 +36,16 @@ const I18N = {
     allocationDetailSummary: (allocated, total, percent) => `${allocated} / ${total} allocated (${percent}% allocated)`,
     allocationChartLabel: percent => `Money structure chart, ${percent}% allocated`,
     moneyStructure: "Money Structure",
+    byRole: "By role",
+    byNeed: "By need",
     fixed: "Fixed",
     spending: "Spending",
     savings: "Savings",
+    needs: "Needs",
+    wants: "Wants",
+    need: "Need",
+    want: "Want",
+    necessity: "Necessity",
     overview: "Overview",
     structureLine: (amount, percent) => `${amount} · ${percent}%`,
     subscriptionInline: (amount, count) => `Subscriptions ${amount} · ${count}`,
@@ -279,9 +289,16 @@ const I18N = {
     allocationDetailSummary: (allocated, total, percent) => `${allocated} / ${total} 已分配（已分配 ${percent}%）`,
     allocationChartLabel: percent => `资金结构图，已分配 ${percent}%`,
     moneyStructure: "资金结构",
+    byRole: "按角色",
+    byNeed: "按必要性",
     fixed: "固定",
     spending: "消费",
     savings: "储蓄投资",
+    needs: "必要",
+    wants: "想要",
+    need: "必要",
+    want: "想要",
+    necessity: "必要性",
     overview: "总览",
     structureLine: (amount, percent) => `${amount} · ${percent}%`,
     subscriptionInline: (amount, count) => `其中订阅 ${amount} · ${count} 个`,
@@ -567,6 +584,17 @@ function normalizeCategoryRole(role) {
   return CATEGORY_ROLES.includes(role) ? role : "spending";
 }
 
+function normalizeNecessity(necessity) {
+  return NECESSITIES.includes(necessity) ? necessity : null;
+}
+
+function necessitySeedFor(fund) {
+  const key = normalizedCategoryName(fund.name);
+  if (NEED_NECESSITY_SEEDS.has(key)) return "need";
+  if (WANT_NECESSITY_SEEDS.has(key)) return "want";
+  return normalizeCategoryRole(fund.role) === "fixed" ? "need" : "want";
+}
+
 function normalizeBillingCycle(cycle) {
   return BILLING_CYCLES.includes(cycle) ? cycle : "monthly";
 }
@@ -582,6 +610,8 @@ function seedExpectedAmount(fund) {
 function normalizeCategoryMetadata(fund) {
   const shouldSeedRole = !fund.role;
   fund.role = shouldSeedRole ? roleSeedFor(fund.name) : normalizeCategoryRole(fund.role);
+  const currentNecessity = normalizeNecessity(fund.necessity);
+  fund.necessity = currentNecessity || (fund.role === "savings" ? null : necessitySeedFor(fund));
   const shouldSeedSubscription = fund.isSubscription === undefined && isSeededSubscription(fund.name);
   fund.isSubscription = shouldSeedSubscription ? true : Boolean(fund.isSubscription);
   fund.billingCycle = normalizeBillingCycle(fund.billingCycle);
@@ -690,6 +720,7 @@ let touchFundDrag = null;
 let suppressFundClick = false;
 let availableRoleFilter = "spending";
 let allocationRowEdit = null;
+let moneyStructureMode = "role";
 let supabaseClient = null;
 let syncSession = null;
 let syncTimer = null;
@@ -726,6 +757,7 @@ const els = {
   allocationDetailQuickAllocateBtn: document.querySelector("#allocationDetailQuickAllocateBtn"),
   allocationDetailTable: document.querySelector("#allocationDetailTable"),
   detailView: document.querySelector("#detailView"),
+  detailHero: document.querySelector("#detailHero"),
   detailFundName: document.querySelector("#detailFundName"),
   detailBalance: document.querySelector("#detailBalance"),
   detailStart: document.querySelector("#detailStart"),
@@ -811,6 +843,12 @@ els.allocationDetailAddIncomeBtn.addEventListener("click", event => {
   openDialog("income");
 });
 els.allocationDetailQuickAllocateBtn.addEventListener("click", () => openDialog("quickAllocate"));
+els.allocationInsights.addEventListener("click", event => {
+  const button = event.target.closest("[data-structure-mode]");
+  if (!button) return;
+  moneyStructureMode = button.dataset.structureMode === "need" ? "need" : "role";
+  renderAllocationDetail();
+});
 els.addRecordBtn.addEventListener("click", toggleAddRecordMenu);
 els.addRecordIncomeBtn.addEventListener("click", () => {
   closeAddRecordMenu();
@@ -875,14 +913,32 @@ els.incomeStorageCard.addEventListener("keydown", event => {
     showAllocationDetail();
   }
 });
+function openSelectedCategorySettings() {
+  const fund = selectedFund();
+  if (fund) openDialog("categoryRole", fund.id);
+}
+
+function isInteractiveElement(element) {
+  return Boolean(element.closest("button, a, input, select, textarea, label, [role='button']:not(#detailHero)"));
+}
+
 document.querySelector("#detailAddExpenseBtn").addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("expense", null, { category: fund.name });
 });
 els.detailMoveBtn.addEventListener("click", () => openDialog("transfer"));
-els.detailFundName.addEventListener("click", () => {
-  const fund = selectedFund();
-  if (fund) openDialog("categoryRole", fund.id);
+els.detailHero.addEventListener("click", event => {
+  if (isInteractiveElement(event.target)) return;
+  openSelectedCategorySettings();
+});
+els.detailHero.addEventListener("keydown", event => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  openSelectedCategorySettings();
+});
+els.detailFundName.addEventListener("click", event => {
+  event.stopPropagation();
+  openSelectedCategorySettings();
 });
 els.addProjectEntryBtn.addEventListener("click", () => {
   const project = selectedProject();
@@ -1471,6 +1527,11 @@ function categoryRoleLabel(role) {
   return t(normalizeCategoryRole(role));
 }
 
+function necessityLabel(necessity) {
+  const normalized = normalizeNecessity(necessity) || "want";
+  return t(normalized);
+}
+
 function billingCycleLabel(cycle) {
   const normalized = normalizeBillingCycle(cycle);
   if (normalized === "monthly") return t("monthly");
@@ -1820,25 +1881,51 @@ function percentOfIncome(amount, totalIncome) {
   return totalIncome > 0 ? (amount / totalIncome) * 100 : 0;
 }
 
+function categoryNecessityForAnalysis(fund) {
+  const role = normalizeCategoryRole(fund.role);
+  if (role === "savings") return "savings";
+  return normalizeNecessity(fund.necessity) || necessitySeedFor(fund);
+}
+
+function necessityAllocationTotal(month, necessity, previewFunds = month.funds) {
+  return previewFunds
+    .filter(fund => normalizeCategoryRole(fund.role) !== "savings")
+    .filter(fund => categoryNecessityForAnalysis(fund) === necessity)
+    .reduce((sumValue, fund) => sumValue + Number(fund.allocation || 0), 0);
+}
+
 function renderMoneyStructure(month = currentMonth(), previewFunds = month.funds) {
   const totalIncome = sum(month.incomes);
   const allocated = sum(previewFunds, "allocation");
   const unallocated = normalizeMoney(totalIncome - allocated);
   const subscription = subscriptionInsights(month);
-  const structure = [
-    { key: "fixed", label: t("fixed"), amount: roleAllocationTotal({ ...month, funds: previewFunds }, "fixed") },
-    { key: "spending", label: t("spending"), amount: roleAllocationTotal({ ...month, funds: previewFunds }, "spending") },
-    { key: "savings", label: t("savings"), amount: roleAllocationTotal({ ...month, funds: previewFunds }, "savings") },
-    { key: "unallocated", label: t("unallocated"), amount: unallocated }
-  ];
+  const structure = moneyStructureMode === "need"
+    ? [
+      { key: "needs", label: t("needs"), amount: necessityAllocationTotal(month, "need", previewFunds) },
+      { key: "wants", label: t("wants"), amount: necessityAllocationTotal(month, "want", previewFunds) },
+      { key: "savings", label: t("savings"), amount: roleAllocationTotal({ ...month, funds: previewFunds }, "savings") },
+      { key: "unallocated", label: t("unallocated"), amount: unallocated }
+    ]
+    : [
+      { key: "fixed", label: t("fixed"), amount: roleAllocationTotal({ ...month, funds: previewFunds }, "fixed") },
+      { key: "spending", label: t("spending"), amount: roleAllocationTotal({ ...month, funds: previewFunds }, "spending") },
+      { key: "savings", label: t("savings"), amount: roleAllocationTotal({ ...month, funds: previewFunds }, "savings") },
+      { key: "unallocated", label: t("unallocated"), amount: unallocated }
+    ];
 
   return `
     <section class="money-structure-card" aria-label="${escapeAttr(t("moneyStructure"))}">
-      <div class="money-structure-title">${t("moneyStructure")}</div>
+      <div class="money-structure-head">
+        <div class="money-structure-title">${t("moneyStructure")}</div>
+        <div class="money-structure-toggle" role="group" aria-label="${escapeAttr(t("moneyStructure"))}">
+          <button type="button" data-structure-mode="role" aria-pressed="${moneyStructureMode === "role"}">${t("byRole")}</button>
+          <button type="button" data-structure-mode="need" aria-pressed="${moneyStructureMode === "need"}">${t("byNeed")}</button>
+        </div>
+      </div>
       <div class="money-structure-grid">
         ${structure.map(item => {
       const percent = percentOfIncome(item.amount, totalIncome);
-      const subscriptionLine = item.key === "fixed" && subscription.count > 0
+      const subscriptionLine = moneyStructureMode === "role" && item.key === "fixed" && subscription.count > 0
         ? `<small>${t("subscriptionInline", money(subscription.monthly), subscription.count)}</small>`
         : "";
       return `
@@ -1894,11 +1981,18 @@ function renderAllocationRow(fund, totalIncome) {
   const incomeShare = percentOfIncome(allocation, totalIncome);
   const afterBalance = balanceFor({ ...fund, allocation });
   const editing = allocationRowEdit?.fundId === fund.id;
+  const showNecessity = normalizeCategoryRole(fund.role) !== "savings";
+  const necessityBadge = showNecessity
+    ? `<span class="necessity-badge necessity-${categoryNecessityForAnalysis(fund)}">${necessityLabel(categoryNecessityForAnalysis(fund))}</span>`
+    : "";
   if (editing) {
     return `
       <article class="allocation-mobile-row allocation-category-row is-row-editing" data-fund-id="${fund.id}">
           <div class="allocation-row-main">
-            <button class="allocation-name-button" type="button" data-action="edit-inline-allocation">${escapeHtml(fund.name)}</button>
+            <div class="allocation-name-line">
+              <button class="allocation-name-button" type="button" data-action="edit-inline-allocation">${escapeHtml(fund.name)}</button>
+              ${necessityBadge}
+            </div>
             <div class="allocation-row-inputs">
               <input name="detail-allocation:${fund.id}" data-detail-allocation-input data-fund-id="${fund.id}" value="${escapeAttr(allocation.toFixed(2))}" type="text" inputmode="decimal" autocomplete="off" aria-label="${escapeAttr(t("allocated"))} ${escapeAttr(fund.name)}">
               <button class="allocation-derived-percent" type="button" data-action="edit-inline-allocation" data-fund-id="${fund.id}">${incomeShare.toFixed(1)}%</button>
@@ -1914,7 +2008,10 @@ function renderAllocationRow(fund, totalIncome) {
   return `
     <article class="allocation-mobile-row allocation-category-row clickable-row" data-fund-id="${fund.id}" data-action="edit-inline-allocation" tabindex="0" aria-label="${escapeAttr(`${fund.name} ${money(allocation)} ${incomeShare.toFixed(1)}%`)}">
         <div class="allocation-row-main">
-          <button class="allocation-name-button" type="button" data-action="edit-inline-allocation">${escapeHtml(fund.name)}</button>
+          <div class="allocation-name-line">
+            <button class="allocation-name-button" type="button" data-action="edit-inline-allocation">${escapeHtml(fund.name)}</button>
+            ${necessityBadge}
+          </div>
           <button class="editable-number allocation-inline-value" type="button" data-action="edit-inline-allocation">
             <span>${money(allocation)}</span>
             <small>${incomeShare.toFixed(1)}%</small>
@@ -2382,13 +2479,22 @@ function renderDetail() {
   const spent = expenseTotalFor(fund.name);
   const records = categoryRecordsFor(fund).sort(compareDetailRecords);
 
+  els.detailHero.setAttribute("aria-label", `${t("editCategorySettings")}: ${fund.name}`);
   els.detailFundName.textContent = fund.name;
   els.detailBalance.textContent = money(balanceFor(fund));
   els.detailStart.textContent = money(fund.start);
   els.detailAllocation.textContent = money(fund.allocation);
   els.detailSpent.textContent = money(spent);
   els.detailRoleLabel.textContent = t("categoryRole");
-  els.detailRoleValue.textContent = categoryRoleLabel(fund.role);
+  if (normalizeCategoryRole(fund.role) === "savings") {
+    els.detailRoleValue.textContent = categoryRoleLabel(fund.role);
+  } else {
+    const necessity = categoryNecessityForAnalysis(fund);
+    els.detailRoleValue.innerHTML = `
+      <span class="detail-role-text">${escapeHtml(categoryRoleLabel(fund.role))}</span>
+      <span class="detail-necessity-pill">${escapeHtml(necessityLabel(necessity))}</span>
+    `;
+  }
   els.detailSubscriptionMeta.textContent = subscriptionMetaText(fund);
   els.detailSubscriptionMeta.hidden = !subscriptionMetaText(fund);
   els.detailExpenseTable.innerHTML = records.length
@@ -3120,9 +3226,12 @@ function preventDialogInputFocus() {
 function updateCategoryFixedFields() {
   if (dialogMode !== "categoryRole") return;
   const fixedSettings = els.form.querySelector("[data-fixed-category-settings]");
+  const necessitySettings = els.form.querySelector("[data-necessity-settings]");
   const roleSelect = els.form.querySelector("[data-category-role-select]");
-  if (!fixedSettings || !roleSelect) return;
-  fixedSettings.hidden = normalizeCategoryRole(roleSelect.value) !== "fixed";
+  if (!roleSelect) return;
+  const role = normalizeCategoryRole(roleSelect.value);
+  if (fixedSettings) fixedSettings.hidden = role !== "fixed";
+  if (necessitySettings) necessitySettings.hidden = role === "savings";
 }
 
 function fieldTemplates(mode, item) {
@@ -3142,6 +3251,7 @@ function fieldTemplates(mode, item) {
 
   if (mode === "categoryRole") {
     const role = normalizeCategoryRole(item.role);
+    const necessity = normalizeNecessity(item.necessity) || necessitySeedFor({ ...item, role });
     const billingCycle = normalizeBillingCycle(item.billingCycle);
     const dueDay = item.dueDay === null || item.dueDay === undefined ? "" : item.dueDay;
     const canEditStart = canEditCategoryStartingBalance(item);
@@ -3164,6 +3274,11 @@ function fieldTemplates(mode, item) {
       <label class="field">${t("categoryRole")}
         <select name="role" data-category-role-select>
           ${CATEGORY_ROLES.map(value => `<option value="${value}" ${role === value ? "selected" : ""}>${categoryRoleLabel(value)}</option>`).join("")}
+        </select>
+      </label>
+      <label class="field" data-necessity-settings ${role === "savings" ? "hidden" : ""}>${t("necessity")}
+        <select name="necessity">
+          ${NECESSITIES.map(value => `<option value="${value}" ${necessity === value ? "selected" : ""}>${t(value)}</option>`).join("")}
         </select>
       </label>
       <section data-fixed-category-settings ${role === "fixed" ? "" : "hidden"}>
@@ -3659,13 +3774,16 @@ function saveCategorySettings(data) {
 
   const previousStart = Number(fund.start || 0);
   const nextStart = canEditStart ? normalizeMoney(startingBalance || 0) : previousStart;
+  const necessity = role === "savings"
+    ? normalizeNecessity(fund.necessity)
+    : (normalizeNecessity(data.necessity) || necessitySeedFor({ ...fund, name: nextName, role }));
   const nameChanged = previousName !== nextName;
   if (nameChanged) {
     renameCategoryRecords(previousName, nextName);
   }
 
   const categoryName = nextName;
-  const metadata = { role, ...(fixedMetadata || {}) };
+  const metadata = { role, necessity, ...(fixedMetadata || {}) };
 
   sortedMonthKeys()
     .filter(key => key >= state.currentMonth)

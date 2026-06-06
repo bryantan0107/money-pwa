@@ -528,11 +528,45 @@ h2 {
   background: rgba(242, 242, 247, 0.58);
 }
 
-.money-structure-title {
+.money-structure-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 10px;
+}
+
+.money-structure-title {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.money-structure-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.money-structure-toggle button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.money-structure-toggle button[aria-pressed="true"] {
+  color: var(--text);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
 }
 
 .money-structure-grid {
@@ -717,6 +751,35 @@ h2 {
   font-weight: 700;
   text-align: left;
   overflow-wrap: anywhere;
+}
+
+.allocation-name-line {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+.necessity-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 19px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(242, 242, 247, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.necessity-need {
+  color: var(--green);
+}
+
+.necessity-want {
+  color: var(--muted);
 }
 
 .role-chip {
@@ -2354,6 +2417,15 @@ label.field.compact {
   gap: 16px;
 }
 
+#detailView .detail-hero {
+  cursor: pointer;
+}
+
+#detailView .detail-hero:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+
 .detail-primary {
   display: flex;
   align-items: flex-start;
@@ -2427,9 +2499,36 @@ label.field.compact {
   text-align: left;
 }
 
-.detail-stats .metric small {
-  color: var(--muted);
+.detail-stats .metric.role strong {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-stats .metric.role strong .detail-role-text {
+  color: var(--text);
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.detail-stats .metric.role strong .detail-necessity-pill {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--text);
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: inherit;
+  padding: 0;
+}
+
+#detailView .detail-stats .metric small {
+  color: var(--text);
   font-size: 11px;
+  font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
