@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.05.3";
+const APP_VERSION = "2026.06.08.1";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
@@ -155,24 +155,20 @@ const I18N = {
     cloudSync: "Cloud Sync",
     cloudSyncText: "Sync this device with Supabase.",
     cloudSyncNotConfigured: "Add your Supabase URL and anon key in sync-config.js.",
-    cloudSyncSignedOut: "Sign in to sync across devices.",
+    cloudSyncSignedOut: "Sign in with your existing account password to sync across devices.",
     cloudSyncSignedIn: email => `Signed in as ${email}`,
     cloudSyncLastSynced: date => `Last synced ${date}`,
     cloudSyncChecking: "Checking cloud data…",
     cloudSyncSaved: "Synced",
-    cloudSyncMagicLink: "Check your email for the sign-in code.",
-    cloudSyncCodeSent: "Enter the code from your email.",
-    cloudSyncInvalidCode: "The code did not work. Check it and try again.",
     cloudSyncError: "Cloud sync failed.",
     cloudSyncConflict: "Cloud data and this device both changed. OK uses cloud data. Cancel keeps this device and uploads it.",
     cloudSyncUseCloud: "Cloud data restored",
     cloudSyncUseLocal: "This device kept",
     signIn: "Sign in",
-    sendCode: "Send code",
-    verifyCode: "Verify",
     signOut: "Sign out",
     syncNow: "Sync now",
     email: "Email",
+    password: "Password",
     code: "Code",
     restore: "Restore",
     restoreText: "Import a backup file from this app.",
@@ -408,24 +404,20 @@ const I18N = {
     cloudSync: "云同步",
     cloudSyncText: "通过 Supabase 同步这台设备。",
     cloudSyncNotConfigured: "请先在 sync-config.js 填入 Supabase URL 和 anon key。",
-    cloudSyncSignedOut: "登录后即可跨设备同步。",
+    cloudSyncSignedOut: "使用现有账号密码登录后即可跨设备同步。",
     cloudSyncSignedIn: email => `已登录：${email}`,
     cloudSyncLastSynced: date => `上次同步 ${date}`,
     cloudSyncChecking: "正在检查云端数据…",
     cloudSyncSaved: "已同步",
-    cloudSyncMagicLink: "请检查邮箱中的登录验证码。",
-    cloudSyncCodeSent: "请输入邮箱里的验证码。",
-    cloudSyncInvalidCode: "验证码无法通过，请检查后再试。",
     cloudSyncError: "云同步失败。",
     cloudSyncConflict: "云端数据和这台设备都发生了变化。点确认使用云端，点取消保留本机并上传。",
     cloudSyncUseCloud: "已恢复云端数据",
     cloudSyncUseLocal: "已保留本机数据",
     signIn: "登录",
-    sendCode: "发送验证码",
-    verifyCode: "验证",
     signOut: "退出登录",
     syncNow: "立即同步",
     email: "Email",
+    password: "密码",
     code: "验证码",
     restore: "恢复",
     restoreText: "从这个 app 导入备份文件。",
@@ -726,7 +718,6 @@ let syncSession = null;
 let syncTimer = null;
 let applyingRemoteState = false;
 let syncInitialized = false;
-let pendingSyncEmail = "";
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -817,7 +808,6 @@ const els = {
   syncEmailInput: document.querySelector("#syncEmailInput"),
   syncCodeInput: document.querySelector("#syncCodeInput"),
   syncSignInBtn: document.querySelector("#syncSignInBtn"),
-  syncVerifyBtn: document.querySelector("#syncVerifyBtn"),
   syncNowBtn: document.querySelector("#syncNowBtn"),
   syncSignOutBtn: document.querySelector("#syncSignOutBtn"),
   backupStatusTitle: document.querySelector("#backupStatusTitle"),
@@ -964,7 +954,6 @@ els.languageSelect.addEventListener("change", event => {
 els.settingsBackupBtn.addEventListener("click", exportData);
 els.settingsImportInput.addEventListener("change", importData);
 els.syncSignInBtn.addEventListener("click", signInToCloudSync);
-els.syncVerifyBtn.addEventListener("click", verifyCloudSyncCode);
 els.syncNowBtn.addEventListener("click", () => syncNow({ manual: true }));
 els.syncSignOutBtn.addEventListener("click", signOutOfCloudSync);
 els.backupNowBtn.addEventListener("click", exportData);
@@ -1789,9 +1778,8 @@ function renderStaticLanguage() {
   els.cloudSyncTitle.textContent = t("cloudSync");
   els.cloudSyncText.textContent = t("cloudSyncText");
   els.syncEmailInput.placeholder = t("email");
-  els.syncCodeInput.placeholder = t("code");
-  els.syncSignInBtn.textContent = t("sendCode");
-  els.syncVerifyBtn.textContent = t("verifyCode");
+  els.syncCodeInput.placeholder = t("password");
+  els.syncSignInBtn.textContent = t("signIn");
   els.syncNowBtn.textContent = t("syncNow");
   els.syncSignOutBtn.textContent = t("signOut");
   els.backupStatusTitle.textContent = t("backupStatus");
@@ -4715,15 +4703,12 @@ function getDeviceId() {
 function renderCloudSyncStatus(message = "") {
   if (!els.cloudSyncStatus) return;
   const configured = isCloudSyncConfigured();
-  const awaitingCode = Boolean(pendingSyncEmail && !syncSession);
   els.syncEmailInput.hidden = !configured || Boolean(syncSession);
-  els.syncCodeInput.hidden = !configured || Boolean(syncSession) || !awaitingCode;
+  els.syncCodeInput.hidden = !configured || Boolean(syncSession);
   els.syncNowBtn.hidden = !configured || !syncSession;
   els.syncSignOutBtn.hidden = !configured || !syncSession;
   els.syncSignInBtn.hidden = !configured || Boolean(syncSession);
-  els.syncVerifyBtn.hidden = !configured || Boolean(syncSession) || !awaitingCode;
-  els.syncSignInBtn.textContent = t("sendCode");
-  els.syncVerifyBtn.textContent = t("verifyCode");
+  els.syncSignInBtn.textContent = t("signIn");
   els.syncNowBtn.textContent = t("syncNow");
   els.syncSignOutBtn.textContent = t("signOut");
 
@@ -4736,7 +4721,7 @@ function renderCloudSyncStatus(message = "") {
     return;
   }
   if (!syncSession) {
-    els.cloudSyncStatus.textContent = awaitingCode ? t("cloudSyncCodeSent") : t("cloudSyncSignedOut");
+    els.cloudSyncStatus.textContent = t("cloudSyncSignedOut");
     return;
   }
   const lastSynced = state.cloudSync?.lastSyncedAt;
@@ -4789,7 +4774,6 @@ async function initCloudSync() {
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     syncSession = session || null;
-    if (syncSession) pendingSyncEmail = "";
     renderCloudSyncStatus();
     if (event === "SIGNED_IN" && syncSession) {
       syncNow({ manual: false });
@@ -4819,60 +4803,19 @@ async function signInToCloudSync() {
     els.syncEmailInput.focus();
     return;
   }
-  const redirectTo = `${window.location.origin}${window.location.pathname}`;
-  const { error } = await supabaseClient.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: true,
-      emailRedirectTo: redirectTo
-    }
-  });
+  const password = els.syncCodeInput.value;
+  if (!password) {
+    els.syncCodeInput.focus();
+    return;
+  }
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) {
     const message = cloudSyncErrorMessage(error);
     showToast(message);
     renderCloudSyncStatus(message);
     return;
   }
-  pendingSyncEmail = email;
-  els.syncCodeInput.value = "";
-  showToast(t("cloudSyncMagicLink"));
-  renderCloudSyncStatus(t("cloudSyncMagicLink"));
-  window.setTimeout(() => els.syncCodeInput.focus(), 0);
-}
-
-async function verifyCloudSyncCode() {
-  if (!isCloudSyncConfigured()) {
-    showToast(t("cloudSyncNotConfigured"));
-    renderCloudSyncStatus();
-    return;
-  }
-  if (!supabaseClient) {
-    await initCloudSync();
-  }
-  const email = pendingSyncEmail || els.syncEmailInput.value.trim();
-  const token = els.syncCodeInput.value.trim().replace(/\s+/g, "");
-  if (!email) {
-    els.syncEmailInput.focus();
-    return;
-  }
-  if (!token) {
-    els.syncCodeInput.focus();
-    return;
-  }
-  const { data, error } = await supabaseClient.auth.verifyOtp({
-    email,
-    token,
-    type: "email"
-  });
-  if (error) {
-    const message = error?.message ? `${t("cloudSyncInvalidCode")} ${error.message}` : t("cloudSyncInvalidCode");
-    showToast(message);
-    renderCloudSyncStatus(message);
-    els.syncCodeInput.focus();
-    return;
-  }
   syncSession = data?.session || null;
-  pendingSyncEmail = "";
   els.syncCodeInput.value = "";
   renderCloudSyncStatus();
   if (syncSession) syncNow({ manual: false });
@@ -4882,7 +4825,6 @@ async function signOutOfCloudSync() {
   if (!supabaseClient) return;
   await supabaseClient.auth.signOut();
   syncSession = null;
-  pendingSyncEmail = "";
   renderCloudSyncStatus();
 }
 
