@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.08.2";
+const APP_VERSION = "2026.06.08.3";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
@@ -1081,7 +1081,8 @@ function normalizeStateLanguage(rawState) {
   rawState.updatedAt = rawState.updatedAt || new Date().toISOString();
   rawState.cloudSync = {
     lastSyncedAt: rawState.cloudSync?.lastSyncedAt || null,
-    lastRemoteUpdatedAt: rawState.cloudSync?.lastRemoteUpdatedAt || null
+    lastRemoteUpdatedAt: rawState.cloudSync?.lastRemoteUpdatedAt || null,
+    lastRemoteFingerprint: rawState.cloudSync?.lastRemoteFingerprint || null
   };
   if (!Array.isArray(rawState.projects)) rawState.projects = [];
   rawState.dataVersion = DATA_VERSION;
@@ -4916,24 +4917,47 @@ async function fetchRemoteSyncState() {
   return data || null;
 }
 
+function remoteSyncFingerprint(remote) {
+  if (!remote) return "";
+  return [
+    remote.updated_at || "",
+    remote.device_id || "",
+    remote.app_version || "",
+    remote.data_json?.updatedAt || ""
+  ].join("|");
+}
+
+function setCloudSyncMarkers(remote, syncedAt = new Date().toISOString()) {
+  state.cloudSync = {
+    lastSyncedAt: syncedAt,
+    lastRemoteUpdatedAt: remote?.updated_at || null,
+    lastRemoteFingerprint: remoteSyncFingerprint(remote)
+  };
+}
+
 async function uploadLocalSyncState() {
   if (!supabaseClient || !syncSession) return;
   const remoteUpdatedAt = new Date().toISOString();
+  const deviceId = getDeviceId();
   const payload = structuredClone(state);
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from(SYNC_TABLE)
     .upsert({
       user_id: syncSession.user.id,
       data_json: payload,
       updated_at: remoteUpdatedAt,
-      device_id: getDeviceId(),
+      device_id: deviceId,
       app_version: APP_VERSION
-    });
+    }, { onConflict: "user_id" })
+    .select("data_json, updated_at, device_id, app_version")
+    .single();
   if (error) throw error;
-  state.cloudSync = {
-    lastSyncedAt: remoteUpdatedAt,
-    lastRemoteUpdatedAt: remoteUpdatedAt
-  };
+  setCloudSyncMarkers(data || {
+    data_json: payload,
+    updated_at: remoteUpdatedAt,
+    device_id: deviceId,
+    app_version: APP_VERSION
+  }, remoteUpdatedAt);
   saveState({ touch: false, sync: false });
   renderCloudSyncStatus();
 }
@@ -4943,10 +4967,7 @@ function applyRemoteSyncState(remote) {
   applyingRemoteState = true;
   try {
     state = normalizeStateLanguage(structuredClone(remote.data_json));
-    state.cloudSync = {
-      lastSyncedAt: new Date().toISOString(),
-      lastRemoteUpdatedAt: remote.updated_at || new Date().toISOString()
-    };
+    setCloudSyncMarkers(remote);
     saveState({ touch: false, sync: false });
   } finally {
     applyingRemoteState = false;
@@ -4980,9 +5001,13 @@ async function syncNow({ manual = false } = {}) {
       return;
     }
 
+    const remoteFingerprint = remoteSyncFingerprint(remote);
+    const lastRemoteFingerprint = state.cloudSync?.lastRemoteFingerprint || "";
     const remoteUpdatedAt = Date.parse(remote.updated_at || "");
     const lastRemoteSeen = Date.parse(state.cloudSync?.lastRemoteUpdatedAt || "");
-    const remoteChanged = remoteUpdatedAt && (!lastRemoteSeen || remoteUpdatedAt > lastRemoteSeen + 1000);
+    const remoteChanged = remoteFingerprint
+      ? remoteFingerprint !== lastRemoteFingerprint
+      : Boolean(remoteUpdatedAt && (!lastRemoteSeen || remoteUpdatedAt > lastRemoteSeen + 1000));
     const localChanged = localChangedAfterLastSync();
 
     if (remoteChanged && localChanged) {
@@ -5009,10 +5034,7 @@ async function syncNow({ manual = false } = {}) {
       return;
     }
 
-    state.cloudSync = {
-      lastSyncedAt: new Date().toISOString(),
-      lastRemoteUpdatedAt: remote.updated_at || state.cloudSync?.lastRemoteUpdatedAt || null
-    };
+    setCloudSyncMarkers(remote);
     saveState({ touch: false, sync: false });
     renderCloudSyncStatus();
     if (manual) showToast(t("cloudSyncSaved"));
