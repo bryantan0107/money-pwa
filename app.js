@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.08.1";
+const APP_VERSION = "2026.06.08.2";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
@@ -160,6 +160,8 @@ const I18N = {
     cloudSyncLastSynced: date => `Last synced ${date}`,
     cloudSyncChecking: "Checking cloud data…",
     cloudSyncSaved: "Synced",
+    cloudSyncPasswordRecovery: "Enter a new password to finish resetting your account.",
+    cloudSyncPasswordUpdated: "Password updated. You are signed in.",
     cloudSyncError: "Cloud sync failed.",
     cloudSyncConflict: "Cloud data and this device both changed. OK uses cloud data. Cancel keeps this device and uploads it.",
     cloudSyncUseCloud: "Cloud data restored",
@@ -169,6 +171,8 @@ const I18N = {
     syncNow: "Sync now",
     email: "Email",
     password: "Password",
+    newPassword: "New password",
+    savePassword: "Save password",
     code: "Code",
     restore: "Restore",
     restoreText: "Import a backup file from this app.",
@@ -409,6 +413,8 @@ const I18N = {
     cloudSyncLastSynced: date => `上次同步 ${date}`,
     cloudSyncChecking: "正在检查云端数据…",
     cloudSyncSaved: "已同步",
+    cloudSyncPasswordRecovery: "请输入新密码来完成账号密码重设。",
+    cloudSyncPasswordUpdated: "密码已更新，已登录。",
     cloudSyncError: "云同步失败。",
     cloudSyncConflict: "云端数据和这台设备都发生了变化。点确认使用云端，点取消保留本机并上传。",
     cloudSyncUseCloud: "已恢复云端数据",
@@ -418,6 +424,8 @@ const I18N = {
     syncNow: "立即同步",
     email: "Email",
     password: "密码",
+    newPassword: "新密码",
+    savePassword: "保存密码",
     code: "验证码",
     restore: "恢复",
     restoreText: "从这个 app 导入备份文件。",
@@ -718,6 +726,7 @@ let syncSession = null;
 let syncTimer = null;
 let applyingRemoteState = false;
 let syncInitialized = false;
+let passwordRecoveryMode = false;
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -807,7 +816,9 @@ const els = {
   cloudSyncStatus: document.querySelector("#cloudSyncStatus"),
   syncEmailInput: document.querySelector("#syncEmailInput"),
   syncCodeInput: document.querySelector("#syncCodeInput"),
+  syncNewPasswordInput: document.querySelector("#syncNewPasswordInput"),
   syncSignInBtn: document.querySelector("#syncSignInBtn"),
+  syncUpdatePasswordBtn: document.querySelector("#syncUpdatePasswordBtn"),
   syncNowBtn: document.querySelector("#syncNowBtn"),
   syncSignOutBtn: document.querySelector("#syncSignOutBtn"),
   backupStatusTitle: document.querySelector("#backupStatusTitle"),
@@ -954,6 +965,7 @@ els.languageSelect.addEventListener("change", event => {
 els.settingsBackupBtn.addEventListener("click", exportData);
 els.settingsImportInput.addEventListener("change", importData);
 els.syncSignInBtn.addEventListener("click", signInToCloudSync);
+els.syncUpdatePasswordBtn.addEventListener("click", updateCloudSyncPassword);
 els.syncNowBtn.addEventListener("click", () => syncNow({ manual: true }));
 els.syncSignOutBtn.addEventListener("click", signOutOfCloudSync);
 els.backupNowBtn.addEventListener("click", exportData);
@@ -1779,7 +1791,9 @@ function renderStaticLanguage() {
   els.cloudSyncText.textContent = t("cloudSyncText");
   els.syncEmailInput.placeholder = t("email");
   els.syncCodeInput.placeholder = t("password");
+  els.syncNewPasswordInput.placeholder = t("newPassword");
   els.syncSignInBtn.textContent = t("signIn");
+  els.syncUpdatePasswordBtn.textContent = t("savePassword");
   els.syncNowBtn.textContent = t("syncNow");
   els.syncSignOutBtn.textContent = t("signOut");
   els.backupStatusTitle.textContent = t("backupStatus");
@@ -4703,12 +4717,16 @@ function getDeviceId() {
 function renderCloudSyncStatus(message = "") {
   if (!els.cloudSyncStatus) return;
   const configured = isCloudSyncConfigured();
-  els.syncEmailInput.hidden = !configured || Boolean(syncSession);
-  els.syncCodeInput.hidden = !configured || Boolean(syncSession);
-  els.syncNowBtn.hidden = !configured || !syncSession;
-  els.syncSignOutBtn.hidden = !configured || !syncSession;
-  els.syncSignInBtn.hidden = !configured || Boolean(syncSession);
+  const signedIn = Boolean(syncSession);
+  els.syncEmailInput.hidden = !configured || signedIn || passwordRecoveryMode;
+  els.syncCodeInput.hidden = !configured || signedIn || passwordRecoveryMode;
+  els.syncNewPasswordInput.hidden = !configured || !passwordRecoveryMode;
+  els.syncNowBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
+  els.syncSignOutBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
+  els.syncSignInBtn.hidden = !configured || signedIn || passwordRecoveryMode;
+  els.syncUpdatePasswordBtn.hidden = !configured || !passwordRecoveryMode;
   els.syncSignInBtn.textContent = t("signIn");
+  els.syncUpdatePasswordBtn.textContent = t("savePassword");
   els.syncNowBtn.textContent = t("syncNow");
   els.syncSignOutBtn.textContent = t("signOut");
 
@@ -4718,6 +4736,10 @@ function renderCloudSyncStatus(message = "") {
   }
   if (message) {
     els.cloudSyncStatus.textContent = message;
+    return;
+  }
+  if (passwordRecoveryMode) {
+    els.cloudSyncStatus.textContent = t("cloudSyncPasswordRecovery");
     return;
   }
   if (!syncSession) {
@@ -4733,6 +4755,21 @@ function renderCloudSyncStatus(message = "") {
 function cloudSyncErrorMessage(error) {
   const detail = error?.message || error?.error_description || "";
   return detail ? `${t("cloudSyncError")} ${detail}` : t("cloudSyncError");
+}
+
+function isPasswordRecoveryUrl() {
+  const source = `${window.location.search || ""}${window.location.hash || ""}`;
+  return source.includes("type=recovery");
+}
+
+function clearAuthUrlState() {
+  if (!window.location.hash && !window.location.search.includes("type=recovery")) return;
+  const url = new URL(window.location.href);
+  ["access_token", "refresh_token", "expires_at", "expires_in", "provider_token", "token_type", "type", "code", "error", "error_code", "error_description"].forEach(key => {
+    url.searchParams.delete(key);
+  });
+  url.hash = "";
+  window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
 }
 
 function scheduleCloudSync() {
@@ -4766,16 +4803,24 @@ async function initCloudSync() {
     }
   });
 
+  passwordRecoveryMode = isPasswordRecoveryUrl();
   const { data } = await supabaseClient.auth.getSession();
   syncSession = data?.session || null;
   syncInitialized = true;
   renderCloudSyncStatus();
-  if (syncSession) syncNow({ manual: false });
+  if (syncSession && !passwordRecoveryMode) syncNow({ manual: false });
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     syncSession = session || null;
+    if (event === "PASSWORD_RECOVERY") {
+      passwordRecoveryMode = true;
+      els.syncNewPasswordInput.value = "";
+      renderCloudSyncStatus(t("cloudSyncPasswordRecovery"));
+      window.setTimeout(() => els.syncNewPasswordInput.focus(), 0);
+      return;
+    }
     renderCloudSyncStatus();
-    if (event === "SIGNED_IN" && syncSession) {
+    if (event === "SIGNED_IN" && syncSession && !passwordRecoveryMode) {
       syncNow({ manual: false });
     }
   });
@@ -4821,10 +4866,42 @@ async function signInToCloudSync() {
   if (syncSession) syncNow({ manual: false });
 }
 
+async function updateCloudSyncPassword() {
+  if (!isCloudSyncConfigured()) {
+    showToast(t("cloudSyncNotConfigured"));
+    renderCloudSyncStatus();
+    return;
+  }
+  if (!supabaseClient) {
+    await initCloudSync();
+  }
+  const password = els.syncNewPasswordInput.value;
+  if (!password) {
+    els.syncNewPasswordInput.focus();
+    return;
+  }
+  const { data, error } = await supabaseClient.auth.updateUser({ password });
+  if (error) {
+    const message = cloudSyncErrorMessage(error);
+    showToast(message);
+    renderCloudSyncStatus(message);
+    els.syncNewPasswordInput.focus();
+    return;
+  }
+  syncSession = data?.session || syncSession;
+  passwordRecoveryMode = false;
+  els.syncNewPasswordInput.value = "";
+  clearAuthUrlState();
+  showToast(t("cloudSyncPasswordUpdated"));
+  renderCloudSyncStatus(t("cloudSyncPasswordUpdated"));
+  if (syncSession) syncNow({ manual: false });
+}
+
 async function signOutOfCloudSync() {
   if (!supabaseClient) return;
   await supabaseClient.auth.signOut();
   syncSession = null;
+  passwordRecoveryMode = false;
   renderCloudSyncStatus();
 }
 
