@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.08.3";
+const APP_VERSION = "2026.06.12.1";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
@@ -169,6 +169,11 @@ const I18N = {
     signIn: "Sign in",
     signOut: "Sign out",
     syncNow: "Sync now",
+    syncDownloadCloud: "Download cloud",
+    syncUploadDevice: "Upload this device",
+    cloudSyncNoCloudData: "No cloud data yet.",
+    cloudSyncDownloadConfirm: "This will replace this device with cloud data. Continue?",
+    cloudSyncUploadConfirm: "This will replace cloud data with this device. Continue?",
     email: "Email",
     password: "Password",
     newPassword: "New password",
@@ -422,6 +427,11 @@ const I18N = {
     signIn: "登录",
     signOut: "退出登录",
     syncNow: "立即同步",
+    syncDownloadCloud: "下载云端",
+    syncUploadDevice: "上传本机",
+    cloudSyncNoCloudData: "云端还没有数据。",
+    cloudSyncDownloadConfirm: "这会用云端数据替换这台设备。是否继续？",
+    cloudSyncUploadConfirm: "这会用这台设备替换云端数据。是否继续？",
     email: "Email",
     password: "密码",
     newPassword: "新密码",
@@ -820,6 +830,8 @@ const els = {
   syncSignInBtn: document.querySelector("#syncSignInBtn"),
   syncUpdatePasswordBtn: document.querySelector("#syncUpdatePasswordBtn"),
   syncNowBtn: document.querySelector("#syncNowBtn"),
+  syncDownloadBtn: document.querySelector("#syncDownloadBtn"),
+  syncUploadBtn: document.querySelector("#syncUploadBtn"),
   syncSignOutBtn: document.querySelector("#syncSignOutBtn"),
   backupStatusTitle: document.querySelector("#backupStatusTitle"),
   backupStatusText: document.querySelector("#backupStatusText"),
@@ -967,6 +979,8 @@ els.settingsImportInput.addEventListener("change", importData);
 els.syncSignInBtn.addEventListener("click", signInToCloudSync);
 els.syncUpdatePasswordBtn.addEventListener("click", updateCloudSyncPassword);
 els.syncNowBtn.addEventListener("click", () => syncNow({ manual: true }));
+els.syncDownloadBtn.addEventListener("click", () => downloadCloudSyncState({ manual: true }));
+els.syncUploadBtn.addEventListener("click", () => uploadDeviceSyncState({ manual: true }));
 els.syncSignOutBtn.addEventListener("click", signOutOfCloudSync);
 els.backupNowBtn.addEventListener("click", exportData);
 els.dismissBackupBtn.addEventListener("click", dismissBackupReminder);
@@ -4723,12 +4737,16 @@ function renderCloudSyncStatus(message = "") {
   els.syncCodeInput.hidden = !configured || signedIn || passwordRecoveryMode;
   els.syncNewPasswordInput.hidden = !configured || !passwordRecoveryMode;
   els.syncNowBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
+  els.syncDownloadBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
+  els.syncUploadBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
   els.syncSignOutBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
   els.syncSignInBtn.hidden = !configured || signedIn || passwordRecoveryMode;
   els.syncUpdatePasswordBtn.hidden = !configured || !passwordRecoveryMode;
   els.syncSignInBtn.textContent = t("signIn");
   els.syncUpdatePasswordBtn.textContent = t("savePassword");
   els.syncNowBtn.textContent = t("syncNow");
+  els.syncDownloadBtn.textContent = t("syncDownloadCloud");
+  els.syncUploadBtn.textContent = t("syncUploadDevice");
   els.syncSignOutBtn.textContent = t("signOut");
 
   if (!configured) {
@@ -4935,6 +4953,21 @@ function setCloudSyncMarkers(remote, syncedAt = new Date().toISOString()) {
   };
 }
 
+async function ensureCloudSyncReady(manual = false) {
+  if (!isCloudSyncConfigured()) {
+    if (manual) showToast(t("cloudSyncNotConfigured"));
+    renderCloudSyncStatus();
+    return false;
+  }
+  if (!supabaseClient) await initCloudSync();
+  if (!syncSession) {
+    if (manual) showToast(t("cloudSyncSignedOut"));
+    renderCloudSyncStatus();
+    return false;
+  }
+  return true;
+}
+
 async function uploadLocalSyncState() {
   if (!supabaseClient || !syncSession) return;
   const remoteUpdatedAt = new Date().toISOString();
@@ -4960,6 +4993,53 @@ async function uploadLocalSyncState() {
   }, remoteUpdatedAt);
   saveState({ touch: false, sync: false });
   renderCloudSyncStatus();
+}
+
+async function downloadCloudSyncState({ manual = false } = {}) {
+  if (!await ensureCloudSyncReady(manual)) return;
+  if (manual) {
+    showToast(t("cloudSyncChecking"));
+    renderCloudSyncStatus(t("cloudSyncChecking"));
+  }
+  try {
+    const remote = await fetchRemoteSyncState();
+    if (!remote) {
+      if (manual) showToast(t("cloudSyncNoCloudData"));
+      renderCloudSyncStatus();
+      return;
+    }
+    if (!window.confirm(t("cloudSyncDownloadConfirm"))) {
+      renderCloudSyncStatus();
+      return;
+    }
+    applyRemoteSyncState(remote);
+    showToast(t("cloudSyncUseCloud"));
+  } catch (error) {
+    console.warn("Cloud download failed", error);
+    if (manual) showToast(t("cloudSyncError"));
+    renderCloudSyncStatus(t("cloudSyncError"));
+  }
+}
+
+async function uploadDeviceSyncState({ manual = false } = {}) {
+  if (!await ensureCloudSyncReady(manual)) return;
+  if (manual) {
+    showToast(t("cloudSyncChecking"));
+    renderCloudSyncStatus(t("cloudSyncChecking"));
+  }
+  try {
+    const remote = await fetchRemoteSyncState();
+    if (remote && !window.confirm(t("cloudSyncUploadConfirm"))) {
+      renderCloudSyncStatus();
+      return;
+    }
+    await uploadLocalSyncState();
+    if (manual) showToast(t("cloudSyncSaved"));
+  } catch (error) {
+    console.warn("Cloud upload failed", error);
+    if (manual) showToast(t("cloudSyncError"));
+    renderCloudSyncStatus(t("cloudSyncError"));
+  }
 }
 
 function applyRemoteSyncState(remote) {
