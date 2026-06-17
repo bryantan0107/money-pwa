@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.12.1";
+const APP_VERSION = "2026.06.17.1";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
@@ -174,6 +174,7 @@ const I18N = {
     cloudSyncNoCloudData: "No cloud data yet.",
     cloudSyncDownloadConfirm: "This will replace this device with cloud data. Continue?",
     cloudSyncUploadConfirm: "This will replace cloud data with this device. Continue?",
+    cloudSyncUploadVerifyFailed: "Upload did not replace cloud data. Please try again.",
     email: "Email",
     password: "Password",
     newPassword: "New password",
@@ -432,6 +433,7 @@ const I18N = {
     cloudSyncNoCloudData: "云端还没有数据。",
     cloudSyncDownloadConfirm: "这会用云端数据替换这台设备。是否继续？",
     cloudSyncUploadConfirm: "这会用这台设备替换云端数据。是否继续？",
+    cloudSyncUploadVerifyFailed: "上传没有成功替换云端数据，请再试一次。",
     email: "Email",
     password: "密码",
     newPassword: "新密码",
@@ -734,6 +736,8 @@ let moneyStructureMode = "role";
 let supabaseClient = null;
 let syncSession = null;
 let syncTimer = null;
+let syncInFlight = false;
+let suppressAutoSyncUntil = 0;
 let applyingRemoteState = false;
 let syncInitialized = false;
 let passwordRecoveryMode = false;
@@ -4793,6 +4797,7 @@ function clearAuthUrlState() {
 
 function scheduleCloudSync() {
   if (applyingRemoteState || !syncInitialized || !syncSession || !isCloudSyncConfigured()) return;
+  if (Date.now() < suppressAutoSyncUntil || syncInFlight) return;
   window.clearTimeout(syncTimer);
   syncTimer = window.setTimeout(() => {
     syncNow({ manual: false });
@@ -4995,8 +5000,19 @@ async function uploadLocalSyncState() {
   renderCloudSyncStatus();
 }
 
+async function verifyCloudUpload(expectedUpdatedAt) {
+  const remote = await fetchRemoteSyncState();
+  if (!remote?.data_json || remote.data_json.updatedAt !== expectedUpdatedAt) {
+    throw new Error("Cloud upload verification failed");
+  }
+  setCloudSyncMarkers(remote);
+  saveState({ touch: false, sync: false });
+  return remote;
+}
+
 async function downloadCloudSyncState({ manual = false } = {}) {
   if (!await ensureCloudSyncReady(manual)) return;
+  if (syncInFlight) return;
   if (manual) {
     showToast(t("cloudSyncChecking"));
     renderCloudSyncStatus(t("cloudSyncChecking"));
@@ -5016,29 +5032,40 @@ async function downloadCloudSyncState({ manual = false } = {}) {
     showToast(t("cloudSyncUseCloud"));
   } catch (error) {
     console.warn("Cloud download failed", error);
-    if (manual) showToast(t("cloudSyncError"));
-    renderCloudSyncStatus(t("cloudSyncError"));
+    const verifyFailed = error?.message === "Cloud upload verification failed";
+    if (manual) showToast(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
+    renderCloudSyncStatus(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
   }
 }
 
 async function uploadDeviceSyncState({ manual = false } = {}) {
   if (!await ensureCloudSyncReady(manual)) return;
+  if (syncInFlight) return;
   if (manual) {
     showToast(t("cloudSyncChecking"));
     renderCloudSyncStatus(t("cloudSyncChecking"));
   }
+  syncInFlight = true;
   try {
     const remote = await fetchRemoteSyncState();
     if (remote && !window.confirm(t("cloudSyncUploadConfirm"))) {
       renderCloudSyncStatus();
       return;
     }
+    window.clearTimeout(syncTimer);
+    state.updatedAt = nowStamp();
+    suppressAutoSyncUntil = Date.now() + 20000;
+    saveState({ touch: false, sync: false });
     await uploadLocalSyncState();
+    await verifyCloudUpload(state.updatedAt);
     if (manual) showToast(t("cloudSyncSaved"));
   } catch (error) {
     console.warn("Cloud upload failed", error);
-    if (manual) showToast(t("cloudSyncError"));
-    renderCloudSyncStatus(t("cloudSyncError"));
+    const verifyFailed = error?.message === "Cloud upload verification failed";
+    if (manual) showToast(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
+    renderCloudSyncStatus(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
+  } finally {
+    syncInFlight = false;
   }
 }
 
@@ -5056,6 +5083,8 @@ function applyRemoteSyncState(remote) {
 }
 
 async function syncNow({ manual = false } = {}) {
+  if (syncInFlight) return;
+  if (!manual && Date.now() < suppressAutoSyncUntil) return;
   if (!isCloudSyncConfigured()) {
     if (manual) showToast(t("cloudSyncNotConfigured"));
     renderCloudSyncStatus();
@@ -5074,9 +5103,11 @@ async function syncNow({ manual = false } = {}) {
   }
 
   try {
+    syncInFlight = true;
     const remote = await fetchRemoteSyncState();
     if (!remote) {
       await uploadLocalSyncState();
+      await verifyCloudUpload(state.updatedAt);
       if (manual) showToast(t("cloudSyncSaved"));
       return;
     }
@@ -5096,7 +5127,10 @@ async function syncNow({ manual = false } = {}) {
         applyRemoteSyncState(remote);
         showToast(t("cloudSyncUseCloud"));
       } else {
+        state.updatedAt = nowStamp();
+        saveState({ touch: false, sync: false });
         await uploadLocalSyncState();
+        await verifyCloudUpload(state.updatedAt);
         showToast(t("cloudSyncUseLocal"));
       }
       return;
@@ -5110,6 +5144,7 @@ async function syncNow({ manual = false } = {}) {
 
     if (localChanged) {
       await uploadLocalSyncState();
+      await verifyCloudUpload(state.updatedAt);
       if (manual) showToast(t("cloudSyncSaved"));
       return;
     }
@@ -5120,8 +5155,11 @@ async function syncNow({ manual = false } = {}) {
     if (manual) showToast(t("cloudSyncSaved"));
   } catch (error) {
     console.warn("Cloud sync failed", error);
-    if (manual) showToast(t("cloudSyncError"));
-    renderCloudSyncStatus(t("cloudSyncError"));
+    const verifyFailed = error?.message === "Cloud upload verification failed";
+    if (manual) showToast(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
+    renderCloudSyncStatus(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
+  } finally {
+    syncInFlight = false;
   }
 }
 
