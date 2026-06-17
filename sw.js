@@ -1,10 +1,10 @@
-const CACHE_NAME = "money-pwa-v116";
+const CACHE_NAME = "money-pwa-v117";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=sync-verify-1",
-  "./sync-config.js?v=sync-verify-1",
-  "./app.js?v=sync-verify-1",
+  "./styles.css?v=sync-safe-1",
+  "./sync-config.js?v=sync-safe-1",
+  "./app.js?v=sync-safe-1",
   "./manifest.webmanifest",
   "./icon.svg"
 ];

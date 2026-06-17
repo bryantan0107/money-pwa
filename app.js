@@ -7,9 +7,10 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.17.1";
+const APP_VERSION = "2026.06.18.1";
 const SYNC_TABLE = "sync_states";
 const SYNC_DEBOUNCE_MS = 1800;
+const SYNC_PROTOCOL_VERSION = 2;
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
 const BILLING_CYCLES = ["monthly", "yearly", "other"];
@@ -164,6 +165,7 @@ const I18N = {
     cloudSyncPasswordUpdated: "Password updated. You are signed in.",
     cloudSyncError: "Cloud sync failed.",
     cloudSyncConflict: "Cloud data and this device both changed. OK uses cloud data. Cancel keeps this device and uploads it.",
+    cloudSyncConflictPending: "Cloud data changed while this device has unsynced changes. Choose Download cloud or Upload this device.",
     cloudSyncUseCloud: "Cloud data restored",
     cloudSyncUseLocal: "This device kept",
     signIn: "Sign in",
@@ -175,6 +177,13 @@ const I18N = {
     cloudSyncDownloadConfirm: "This will replace this device with cloud data. Continue?",
     cloudSyncUploadConfirm: "This will replace cloud data with this device. Continue?",
     cloudSyncUploadVerifyFailed: "Upload did not replace cloud data. Please try again.",
+    syncDiagLocalUpdated: "Local updated",
+    syncDiagPendingUpload: "Pending upload",
+    syncDiagCloudRowUpdated: "Cloud row updated",
+    syncDiagCloudDataUpdated: "Cloud data updated",
+    syncDiagCloudDevice: "Cloud device",
+    syncDiagCloudVersion: "Cloud app version",
+    syncDiagLastSynced: "Last synced",
     email: "Email",
     password: "Password",
     newPassword: "New password",
@@ -423,6 +432,7 @@ const I18N = {
     cloudSyncPasswordUpdated: "密码已更新，已登录。",
     cloudSyncError: "云同步失败。",
     cloudSyncConflict: "云端数据和这台设备都发生了变化。点确认使用云端，点取消保留本机并上传。",
+    cloudSyncConflictPending: "云端数据已变化，而这台设备也有未上传修改。请选择下载云端或上传本机。",
     cloudSyncUseCloud: "已恢复云端数据",
     cloudSyncUseLocal: "已保留本机数据",
     signIn: "登录",
@@ -434,6 +444,13 @@ const I18N = {
     cloudSyncDownloadConfirm: "这会用云端数据替换这台设备。是否继续？",
     cloudSyncUploadConfirm: "这会用这台设备替换云端数据。是否继续？",
     cloudSyncUploadVerifyFailed: "上传没有成功替换云端数据，请再试一次。",
+    syncDiagLocalUpdated: "本机更新",
+    syncDiagPendingUpload: "待上传",
+    syncDiagCloudRowUpdated: "云端行更新",
+    syncDiagCloudDataUpdated: "云端数据更新",
+    syncDiagCloudDevice: "云端设备",
+    syncDiagCloudVersion: "云端版本",
+    syncDiagLastSynced: "上次同步",
     email: "Email",
     password: "密码",
     newPassword: "新密码",
@@ -741,6 +758,7 @@ let suppressAutoSyncUntil = 0;
 let applyingRemoteState = false;
 let syncInitialized = false;
 let passwordRecoveryMode = false;
+let lastFetchedRemoteSync = null;
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -828,6 +846,7 @@ const els = {
   cloudSyncTitle: document.querySelector("#cloudSyncTitle"),
   cloudSyncText: document.querySelector("#cloudSyncText"),
   cloudSyncStatus: document.querySelector("#cloudSyncStatus"),
+  cloudSyncDiagnostics: document.querySelector("#cloudSyncDiagnostics"),
   syncEmailInput: document.querySelector("#syncEmailInput"),
   syncCodeInput: document.querySelector("#syncCodeInput"),
   syncNewPasswordInput: document.querySelector("#syncNewPasswordInput"),
@@ -1100,7 +1119,9 @@ function normalizeStateLanguage(rawState) {
   rawState.cloudSync = {
     lastSyncedAt: rawState.cloudSync?.lastSyncedAt || null,
     lastRemoteUpdatedAt: rawState.cloudSync?.lastRemoteUpdatedAt || null,
-    lastRemoteFingerprint: rawState.cloudSync?.lastRemoteFingerprint || null
+    lastRemoteFingerprint: rawState.cloudSync?.lastRemoteFingerprint || null,
+    pendingUploadUpdatedAt: rawState.cloudSync?.pendingUploadUpdatedAt || null,
+    syncProtocolVersion: Number(rawState.cloudSync?.syncProtocolVersion || SYNC_PROTOCOL_VERSION)
   };
   if (!Array.isArray(rawState.projects)) rawState.projects = [];
   rawState.dataVersion = DATA_VERSION;
@@ -1245,11 +1266,39 @@ function saveState(options = {}) {
   const touch = options.touch !== false;
   if (touch && !applyingRemoteState) {
     state.updatedAt = new Date().toISOString();
+    markPendingCloudUpload(state.updatedAt);
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   if (options.sync !== false && !applyingRemoteState) {
     scheduleCloudSync();
   }
+}
+
+function ensureCloudSyncState() {
+  state.cloudSync = {
+    lastSyncedAt: state.cloudSync?.lastSyncedAt || null,
+    lastRemoteUpdatedAt: state.cloudSync?.lastRemoteUpdatedAt || null,
+    lastRemoteFingerprint: state.cloudSync?.lastRemoteFingerprint || null,
+    pendingUploadUpdatedAt: state.cloudSync?.pendingUploadUpdatedAt || null,
+    syncProtocolVersion: Number(state.cloudSync?.syncProtocolVersion || SYNC_PROTOCOL_VERSION)
+  };
+  return state.cloudSync;
+}
+
+function markPendingCloudUpload(updatedAt = state.updatedAt) {
+  const cloudSync = ensureCloudSyncState();
+  cloudSync.pendingUploadUpdatedAt = updatedAt || new Date().toISOString();
+  cloudSync.syncProtocolVersion = SYNC_PROTOCOL_VERSION;
+}
+
+function clearPendingCloudUpload() {
+  const cloudSync = ensureCloudSyncState();
+  cloudSync.pendingUploadUpdatedAt = null;
+  cloudSync.syncProtocolVersion = SYNC_PROTOCOL_VERSION;
+}
+
+function hasPendingCloudUpload() {
+  return Boolean(state.cloudSync?.pendingUploadUpdatedAt);
 }
 
 function markFinancialDirty() {
@@ -4755,24 +4804,52 @@ function renderCloudSyncStatus(message = "") {
 
   if (!configured) {
     els.cloudSyncStatus.textContent = t("cloudSyncNotConfigured");
+    renderCloudSyncDiagnostics(null);
     return;
   }
   if (message) {
     els.cloudSyncStatus.textContent = message;
+    renderCloudSyncDiagnostics(lastFetchedRemoteSync);
     return;
   }
   if (passwordRecoveryMode) {
     els.cloudSyncStatus.textContent = t("cloudSyncPasswordRecovery");
+    renderCloudSyncDiagnostics(lastFetchedRemoteSync);
     return;
   }
   if (!syncSession) {
     els.cloudSyncStatus.textContent = t("cloudSyncSignedOut");
+    renderCloudSyncDiagnostics(null);
     return;
   }
   const lastSynced = state.cloudSync?.lastSyncedAt;
   els.cloudSyncStatus.textContent = lastSynced
     ? t("cloudSyncLastSynced", formatShortDate(lastSynced.slice(0, 10)))
     : t("cloudSyncSignedIn", syncSession.user?.email || "");
+  renderCloudSyncDiagnostics(lastFetchedRemoteSync);
+}
+
+function syncDiagnosticValue(value) {
+  return value || "—";
+}
+
+function renderCloudSyncDiagnostics(remote = lastFetchedRemoteSync) {
+  if (!els.cloudSyncDiagnostics) return;
+  if (!isCloudSyncConfigured() || !syncSession || passwordRecoveryMode) {
+    els.cloudSyncDiagnostics.textContent = "";
+    return;
+  }
+  const cloudSync = state.cloudSync || {};
+  const lines = [
+    `${t("syncDiagLocalUpdated")}: ${syncDiagnosticValue(state.updatedAt)}`,
+    `${t("syncDiagPendingUpload")}: ${syncDiagnosticValue(cloudSync.pendingUploadUpdatedAt)}`,
+    `${t("syncDiagCloudRowUpdated")}: ${syncDiagnosticValue(remote?.updated_at)}`,
+    `${t("syncDiagCloudDataUpdated")}: ${syncDiagnosticValue(remote?.data_json?.updatedAt)}`,
+    `${t("syncDiagCloudDevice")}: ${syncDiagnosticValue(remote?.device_id)}`,
+    `${t("syncDiagCloudVersion")}: ${syncDiagnosticValue(remote?.app_version)}`,
+    `${t("syncDiagLastSynced")}: ${syncDiagnosticValue(cloudSync.lastSyncedAt)}`
+  ];
+  els.cloudSyncDiagnostics.textContent = lines.join("\n");
 }
 
 function cloudSyncErrorMessage(error) {
@@ -4937,7 +5014,8 @@ async function fetchRemoteSyncState() {
     .eq("user_id", syncSession.user.id)
     .maybeSingle();
   if (error) throw error;
-  return data || null;
+  lastFetchedRemoteSync = data || null;
+  return lastFetchedRemoteSync;
 }
 
 function remoteSyncFingerprint(remote) {
@@ -4950,12 +5028,27 @@ function remoteSyncFingerprint(remote) {
   ].join("|");
 }
 
-function setCloudSyncMarkers(remote, syncedAt = new Date().toISOString()) {
+function setCloudSyncMarkers(remote, syncedAt = new Date().toISOString(), options = {}) {
+  const clearPending = options.clearPending !== false;
+  const pendingUploadUpdatedAt = clearPending ? null : state.cloudSync?.pendingUploadUpdatedAt || null;
   state.cloudSync = {
     lastSyncedAt: syncedAt,
     lastRemoteUpdatedAt: remote?.updated_at || null,
-    lastRemoteFingerprint: remoteSyncFingerprint(remote)
+    lastRemoteFingerprint: remoteSyncFingerprint(remote),
+    pendingUploadUpdatedAt,
+    syncProtocolVersion: SYNC_PROTOCOL_VERSION
   };
+}
+
+function remoteChangedSinceLastSync(remote) {
+  if (!remote) return false;
+  const remoteFingerprint = remoteSyncFingerprint(remote);
+  const lastRemoteFingerprint = state.cloudSync?.lastRemoteFingerprint || "";
+  if (!lastRemoteFingerprint) return true;
+  if (remoteFingerprint && remoteFingerprint !== lastRemoteFingerprint) return true;
+  const remoteUpdatedAt = Date.parse(remote.updated_at || "");
+  const lastRemoteSeen = Date.parse(state.cloudSync?.lastRemoteUpdatedAt || "");
+  return Boolean(remoteUpdatedAt && lastRemoteSeen && remoteUpdatedAt > lastRemoteSeen + 1000);
 }
 
 async function ensureCloudSyncReady(manual = false) {
@@ -4978,6 +5071,11 @@ async function uploadLocalSyncState() {
   const remoteUpdatedAt = new Date().toISOString();
   const deviceId = getDeviceId();
   const payload = structuredClone(state);
+  payload.cloudSync = {
+    ...(payload.cloudSync || {}),
+    pendingUploadUpdatedAt: null,
+    syncProtocolVersion: SYNC_PROTOCOL_VERSION
+  };
   const { data, error } = await supabaseClient
     .from(SYNC_TABLE)
     .upsert({
@@ -4990,24 +5088,47 @@ async function uploadLocalSyncState() {
     .select("data_json, updated_at, device_id, app_version")
     .single();
   if (error) throw error;
-  setCloudSyncMarkers(data || {
+  const remoteRow = data || {
     data_json: payload,
     updated_at: remoteUpdatedAt,
     device_id: deviceId,
     app_version: APP_VERSION
-  }, remoteUpdatedAt);
+  };
+  lastFetchedRemoteSync = remoteRow;
+  setCloudSyncMarkers(remoteRow, remoteUpdatedAt);
   saveState({ touch: false, sync: false });
   renderCloudSyncStatus();
+  return {
+    row: remoteRow,
+    updatedAt: payload.updatedAt,
+    remoteUpdatedAt,
+    deviceId
+  };
 }
 
-async function verifyCloudUpload(expectedUpdatedAt) {
+async function verifyCloudUpload(expected) {
   const remote = await fetchRemoteSyncState();
-  if (!remote?.data_json || remote.data_json.updatedAt !== expectedUpdatedAt) {
+  const expectedUpdatedAt = typeof expected === "string" ? expected : expected?.updatedAt;
+  const expectedRemoteUpdatedAt = typeof expected === "string" ? "" : expected?.remoteUpdatedAt;
+  const expectedDeviceId = typeof expected === "string" ? getDeviceId() : expected?.deviceId;
+  const matchesData = remote?.data_json?.updatedAt === expectedUpdatedAt;
+  const matchesDevice = remote?.device_id === expectedDeviceId;
+  const matchesVersion = remote?.app_version === APP_VERSION;
+  const matchesRemoteTime = syncTimeMatches(remote?.updated_at, expectedRemoteUpdatedAt);
+  if (!remote?.data_json || !matchesData || !matchesDevice || !matchesVersion || !matchesRemoteTime) {
     throw new Error("Cloud upload verification failed");
   }
   setCloudSyncMarkers(remote);
   saveState({ touch: false, sync: false });
   return remote;
+}
+
+function syncTimeMatches(actual, expected) {
+  if (!expected) return true;
+  if (actual === expected) return true;
+  const actualTime = Date.parse(actual || "");
+  const expectedTime = Date.parse(expected || "");
+  return Boolean(actualTime && expectedTime && Math.abs(actualTime - expectedTime) < 2000);
 }
 
 async function downloadCloudSyncState({ manual = false } = {}) {
@@ -5054,10 +5175,11 @@ async function uploadDeviceSyncState({ manual = false } = {}) {
     }
     window.clearTimeout(syncTimer);
     state.updatedAt = nowStamp();
+    markPendingCloudUpload(state.updatedAt);
     suppressAutoSyncUntil = Date.now() + 20000;
     saveState({ touch: false, sync: false });
-    await uploadLocalSyncState();
-    await verifyCloudUpload(state.updatedAt);
+    const uploadResult = await uploadLocalSyncState();
+    await verifyCloudUpload(uploadResult);
     if (manual) showToast(t("cloudSyncSaved"));
   } catch (error) {
     console.warn("Cloud upload failed", error);
@@ -5106,52 +5228,38 @@ async function syncNow({ manual = false } = {}) {
     syncInFlight = true;
     const remote = await fetchRemoteSyncState();
     if (!remote) {
-      await uploadLocalSyncState();
-      await verifyCloudUpload(state.updatedAt);
+      if (!hasPendingCloudUpload()) markPendingCloudUpload(state.updatedAt);
+      const uploadResult = await uploadLocalSyncState();
+      await verifyCloudUpload(uploadResult);
       if (manual) showToast(t("cloudSyncSaved"));
       return;
     }
 
-    const remoteFingerprint = remoteSyncFingerprint(remote);
-    const lastRemoteFingerprint = state.cloudSync?.lastRemoteFingerprint || "";
-    const remoteUpdatedAt = Date.parse(remote.updated_at || "");
-    const lastRemoteSeen = Date.parse(state.cloudSync?.lastRemoteUpdatedAt || "");
-    const remoteChanged = remoteFingerprint
-      ? remoteFingerprint !== lastRemoteFingerprint
-      : Boolean(remoteUpdatedAt && (!lastRemoteSeen || remoteUpdatedAt > lastRemoteSeen + 1000));
-    const localChanged = localChangedAfterLastSync();
+    const remoteChanged = remoteChangedSinceLastSync(remote);
+    const pendingLocal = hasPendingCloudUpload();
 
-    if (remoteChanged && localChanged) {
-      const useCloud = window.confirm(t("cloudSyncConflict"));
-      if (useCloud) {
+    if (!pendingLocal) {
+      if (remoteChanged) {
         applyRemoteSyncState(remote);
-        showToast(t("cloudSyncUseCloud"));
-      } else {
-        state.updatedAt = nowStamp();
-        saveState({ touch: false, sync: false });
-        await uploadLocalSyncState();
-        await verifyCloudUpload(state.updatedAt);
-        showToast(t("cloudSyncUseLocal"));
+        if (manual) showToast(t("cloudSyncUseCloud"));
+        return;
       }
-      return;
-    }
-
-    if (remoteChanged && !localChanged) {
-      applyRemoteSyncState(remote);
-      if (manual) showToast(t("cloudSyncUseCloud"));
-      return;
-    }
-
-    if (localChanged) {
-      await uploadLocalSyncState();
-      await verifyCloudUpload(state.updatedAt);
+      setCloudSyncMarkers(remote);
+      saveState({ touch: false, sync: false });
+      renderCloudSyncStatus();
       if (manual) showToast(t("cloudSyncSaved"));
       return;
     }
 
-    setCloudSyncMarkers(remote);
-    saveState({ touch: false, sync: false });
-    renderCloudSyncStatus();
+    if (remoteChanged) {
+      const message = t("cloudSyncConflictPending");
+      if (manual) showToast(message);
+      renderCloudSyncStatus(message);
+      return;
+    }
+
+    const uploadResult = await uploadLocalSyncState();
+    await verifyCloudUpload(uploadResult);
     if (manual) showToast(t("cloudSyncSaved"));
   } catch (error) {
     console.warn("Cloud sync failed", error);

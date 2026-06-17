@@ -1895,6 +1895,12 @@ label.field.compact {
   line-height: 1.35;
 }
 
+.settings-item .sync-diagnostics {
+  margin-top: 10px;
+  white-space: pre-line;
+  line-height: 1.45;
+}
+
 .settings-actions {
   display: flex;
   align-items: center;
