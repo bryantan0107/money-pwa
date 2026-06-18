@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=sync-safe-1">
+    <link rel="stylesheet" href="styles.css?v=manual-sync-1">
   </head>
   <body>
     <div class="app-shell">
@@ -192,7 +192,6 @@
                   <input id="syncNewPasswordInput" type="password" autocomplete="new-password" placeholder="New password" hidden>
                   <button id="syncSignInBtn" type="button">Sign in</button>
                   <button id="syncUpdatePasswordBtn" type="button" hidden>Save password</button>
-                  <button id="syncNowBtn" type="button">Sync now</button>
                   <button id="syncDownloadBtn" type="button">Download cloud</button>
                   <button id="syncUploadBtn" type="button">Upload this device</button>
                   <button id="syncSignOutBtn" type="button" hidden>Sign out</button>
@@ -441,7 +440,7 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="sync-config.js?v=sync-safe-1"></script>
-    <script src="app.js?v=sync-safe-1"></script>
+    <script src="sync-config.js?v=manual-sync-1"></script>
+    <script src="app.js?v=manual-sync-1"></script>
   </body>
 </html>

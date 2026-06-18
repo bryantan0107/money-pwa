@@ -1,13 +1,14 @@
-const CACHE_NAME = "money-pwa-v117";
+const CACHE_NAME = "money-pwa-v118";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=sync-safe-1",
-  "./sync-config.js?v=sync-safe-1",
-  "./app.js?v=sync-safe-1",
+  "./styles.css?v=manual-sync-1",
+  "./sync-config.js?v=manual-sync-1",
+  "./app.js?v=manual-sync-1",
   "./manifest.webmanifest",
   "./icon.svg"
 ];
+const STATIC_PATHS = new Set(APP_SHELL);
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -33,6 +34,12 @@ self.addEventListener("message", event => {
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
+  const url = new URL(request.url);
+
+  if (url.origin !== self.location.origin) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -44,6 +51,13 @@ self.addEventListener("fetch", event => {
         })
         .catch(() => caches.match("./index.html"))
     );
+    return;
+  }
+
+  const appShellKey = `${url.pathname.split("/").pop()}${url.search}`;
+  const relativeKey = `./${appShellKey}`;
+  if (!STATIC_PATHS.has(relativeKey) && !STATIC_PATHS.has(`.${url.pathname}`)) {
+    event.respondWith(fetch(request));
     return;
   }
 
