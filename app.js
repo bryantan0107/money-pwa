@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.29.1";
+const APP_VERSION = "2026.06.29.2";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -256,6 +256,10 @@ const I18N = {
     deleteSettledProjectConfirm: name => `Delete ${name}? This also removes the expense records created when this project was settled.`,
     moveFunds: "Move Between Categories",
     allocationChanged: "Allocation changed",
+    lastAllocationShort: amount => `Last ${amount}`,
+    suggestedAllocationShort: amount => `Suggested ${amount}`,
+    useSuggestion: "Use",
+    allocationSuggestionApplied: "Suggested amount applied",
     toCategoryNote: category => `To ${category}`,
     fromCategoryNote: category => `From ${category}`,
     greyMonths: "Grey months have not been created yet. The small line marks the real current month.",
@@ -518,6 +522,10 @@ const I18N = {
     deleteSettledProjectConfirm: name => `删除 ${name}？这也会删除项目结算时生成的正式支出记录。`,
     moveFunds: "分类间移动",
     allocationChanged: "分配调整",
+    lastAllocationShort: amount => `上月 ${amount}`,
+    suggestedAllocationShort: amount => `建议 ${amount}`,
+    useSuggestion: "套用",
+    allocationSuggestionApplied: "已套用建议金额",
     toCategoryNote: category => `到 ${category}`,
     fromCategoryNote: category => `从 ${category}`,
     greyMonths: "灰色月份还没有创建。细线标记现实中的当前月份。",
@@ -899,6 +907,13 @@ document.querySelector("#backToDashboardBtn").addEventListener("click", showDash
 document.querySelector("#backToDashboardFromAllocationBtn").addEventListener("click", showDashboard);
 document.querySelector("#backToProjectsBtn").addEventListener("click", showDashboard);
 els.allocationDetailTable.addEventListener("click", event => {
+  const suggestionButton = event.target.closest("[data-action='use-allocation-suggestion']");
+  if (suggestionButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    applyAllocationSuggestion(suggestionButton.dataset.fundId);
+    return;
+  }
   const trigger = event.target.closest("[data-action='edit-inline-allocation']");
   if (!trigger) return;
   const nextFundId = trigger.closest("[data-fund-id]")?.dataset.fundId;
@@ -1307,6 +1322,33 @@ function previousCategoryFor(fund, monthId = state.currentMonth) {
   const previousKey = previousMonthKey(monthId);
   if (!previousKey || !fund) return null;
   return (state.months[previousKey]?.funds || []).find(item => categoryNamesMatch(item.name, fund.name)) || null;
+}
+
+function allocationSuggestionFor(fund, monthId = state.currentMonth) {
+  const previousKey = previousMonthKey(monthId);
+  const previousFund = previousCategoryFor(fund, monthId);
+  const previousMonth = previousKey ? state.months[previousKey] : null;
+  const lastAllocation = previousFund ? normalizeMoney(Number(previousFund.allocation || 0)) : null;
+  const lastSpent = previousFund && previousMonth
+    ? normalizeMoney(expenseTotalFor(previousFund.name, previousMonth))
+    : null;
+  const expectedAmount = normalizeMoney(Number(fund.expectedAmount || 0));
+  let suggested = 0;
+
+  if (normalizeCategoryRole(fund.role) === "fixed") {
+    if (expectedAmount > 0) suggested = expectedAmount;
+    else if (lastAllocation !== null && lastAllocation > 0) suggested = lastAllocation;
+    else if (lastSpent !== null && lastSpent > 0) suggested = lastSpent;
+  } else if (lastAllocation !== null) {
+    suggested = lastAllocation;
+  }
+
+  return {
+    previousFund,
+    lastAllocation,
+    lastSpent,
+    suggested: normalizeMoney(suggested)
+  };
 }
 
 function canEditCategoryStartingBalance(fund, monthId = state.currentMonth) {
@@ -2004,6 +2046,22 @@ function renderAllocationRow(fund, totalIncome) {
   const incomeShare = percentOfIncome(allocation, totalIncome);
   const afterBalance = balanceFor({ ...fund, allocation });
   const editing = allocationRowEdit?.fundId === fund.id;
+  const suggestion = allocationSuggestionFor(fund);
+  const suggestionParts = [];
+  if (suggestion.previousFund) {
+    suggestionParts.push(t("lastAllocationShort", money(suggestion.lastAllocation)));
+  }
+  if (suggestion.suggested > 0) {
+    suggestionParts.push(t("suggestedAllocationShort", money(suggestion.suggested)));
+  }
+  const showSuggestion = suggestionParts.length > 0;
+  const canUseSuggestion = suggestion.suggested > 0 && moneyCents(suggestion.suggested) !== moneyCents(allocation);
+  const suggestionMarkup = showSuggestion
+    ? `<div class="allocation-row-suggestion">
+          <span>${suggestionParts.map(escapeHtml).join(" · ")}</span>
+          ${canUseSuggestion ? `<button class="allocation-suggestion-button" type="button" data-action="use-allocation-suggestion" data-fund-id="${fund.id}">${t("useSuggestion")}</button>` : ""}
+        </div>`
+    : "";
   const showNecessity = normalizeCategoryRole(fund.role) !== "savings";
   const necessityBadge = showNecessity
     ? `<span class="necessity-badge necessity-${categoryNecessityForAnalysis(fund)}">${necessityLabel(categoryNecessityForAnalysis(fund))}</span>`
@@ -2025,6 +2083,7 @@ function renderAllocationRow(fund, totalIncome) {
             <span>${t("startingBalance")} ${money(fund.start)} ·</span>
             <span data-after-balance>${t("available")} ${money(afterBalance)}</span>
           </div>
+          ${suggestionMarkup}
       </article>
     `;
   }
@@ -2044,6 +2103,7 @@ function renderAllocationRow(fund, totalIncome) {
           <span>${t("startingBalance")} ${money(fund.start)} ·</span>
           <span>${t("available")} ${money(afterBalance)}</span>
         </div>
+        ${suggestionMarkup}
     </article>
   `;
 }
@@ -2111,6 +2171,35 @@ function cancelAllocationRowEdit() {
   renderAllocationDetail();
 }
 
+function saveCategoryAllocationAmount(fund, amount) {
+  const totalIncome = sum(currentMonth().incomes);
+  const totalAllocated = currentMonth().funds.reduce((total, item) => {
+    return total + (item.id === fund.id ? amount : Number(item.allocation || 0));
+  }, 0);
+  const overAllocatedCents = moneyCents(totalAllocated) - moneyCents(totalIncome);
+  if (overAllocatedCents > 0) {
+    return { ok: false, reason: "over-allocated", overAllocatedCents };
+  }
+
+  const previousAllocation = Number(fund.allocation || 0);
+  if (moneyCents(previousAllocation) === moneyCents(amount)) {
+    return { ok: true, changed: false };
+  }
+
+  fund.allocation = normalizeMoney(amount);
+  fund.updatedAt = nowStamp();
+  addCategoryEvent({
+    type: "allocation-adjustment",
+    category: fund.name,
+    amount: amount - previousAllocation,
+    note: t("allocationChanged")
+  });
+  cascadeLaterMonthStartsQuietly();
+  markFinancialDirty();
+  saveState();
+  return { ok: true, changed: true };
+}
+
 function commitAllocationRowEdit(input) {
   if (!allocationRowEdit || !input) return;
   if (input.dataset.fundId !== allocationRowEdit.fundId) return;
@@ -2129,35 +2218,37 @@ function commitAllocationRowEdit(input) {
     return;
   }
 
-  const totalIncome = sum(currentMonth().incomes);
-  const totalAllocated = currentMonth().funds.reduce((total, item) => {
-    return total + (item.id === fund.id ? amount : Number(item.allocation || 0));
-  }, 0);
-  const overAllocatedCents = moneyCents(totalAllocated) - moneyCents(totalIncome);
-  if (overAllocatedCents > 0) {
-    showToast(t("overAllocated", money(centsToMoney(overAllocatedCents))));
+  const result = saveCategoryAllocationAmount(fund, amount);
+  if (!result.ok && result.reason === "over-allocated") {
+    showToast(t("overAllocated", money(centsToMoney(result.overAllocatedCents))));
     input.focus({ preventScroll: true });
     input.select();
     refreshInlineAllocationSummary();
     return;
   }
 
-  const previousAllocation = Number(fund.allocation || 0);
-  if (moneyCents(previousAllocation) !== moneyCents(amount)) {
-    fund.allocation = normalizeMoney(amount);
-    fund.updatedAt = nowStamp();
-    addCategoryEvent({
-      type: "allocation-adjustment",
-      category: fund.name,
-      amount: amount - previousAllocation,
-      note: t("allocationChanged")
-    });
-    cascadeLaterMonthStartsQuietly();
-    markFinancialDirty();
-    saveState();
+  if (result.changed) {
     showToast(t("savedToast"));
   }
   allocationRowEdit = null;
+  render();
+}
+
+function applyAllocationSuggestion(fundId) {
+  const fund = currentMonth().funds.find(item => item.id === fundId);
+  if (!fund) return;
+  if (allocationRowEdit) {
+    cancelAllocationRowEdit();
+  }
+  const suggestion = allocationSuggestionFor(fund);
+  const amount = suggestion.suggested;
+  if (amount <= 0) return;
+  const result = saveCategoryAllocationAmount(fund, amount);
+  if (!result.ok && result.reason === "over-allocated") {
+    showToast(t("overAllocated", money(centsToMoney(result.overAllocatedCents))));
+    return;
+  }
+  showToast(result.changed ? t("allocationSuggestionApplied") : t("savedToast"));
   render();
 }
 

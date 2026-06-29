@@ -844,6 +844,34 @@ h2 {
   font-weight: 500;
 }
 
+.allocation-row-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.allocation-row-suggestion span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.allocation-suggestion-button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 11px;
+  border-color: var(--line);
+  color: var(--blue);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .detail-name-button {
   display: inline-flex;
   max-width: 100%;
