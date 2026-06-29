@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.18.2";
+const APP_VERSION = "2026.06.29.1";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -641,6 +641,21 @@ function normalizeCategoryMetadata(fund) {
   fund.dueDay = Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31 ? dueDay : null;
 }
 
+function categorySettingsSnapshot(fund) {
+  return {
+    target: Number(fund.target || 0),
+    pinned: Boolean(fund.pinned),
+    role: normalizeCategoryRole(fund.role),
+    necessity: normalizeCategoryRole(fund.role) === "savings"
+      ? null
+      : (normalizeNecessity(fund.necessity) || necessitySeedFor(fund)),
+    isSubscription: Boolean(fund.isSubscription),
+    billingCycle: normalizeBillingCycle(fund.billingCycle),
+    expectedAmount: Number(fund.expectedAmount || 0),
+    dueDay: fund.dueDay ?? null
+  };
+}
+
 const initialData = {
   currentMonth: "2026-05",
   dataVersion: DATA_VERSION,
@@ -1204,13 +1219,7 @@ function repairCategoryLifecycleGaps(rawState) {
         name: previousFund.name,
         start: balanceForMonthFund(previousFund, previous),
         allocation: 0,
-        target: Number(previousFund.target || 0),
-        pinned: Boolean(previousFund.pinned),
-        role: normalizeCategoryRole(previousFund.role),
-        isSubscription: Boolean(previousFund.isSubscription),
-        billingCycle: normalizeBillingCycle(previousFund.billingCycle),
-        expectedAmount: Number(previousFund.expectedAmount || 0),
-        dueDay: previousFund.dueDay ?? null,
+        ...categorySettingsSnapshot(previousFund),
         createdAt: fallbackTimestamp(`${monthId}-01`),
         updatedAt: ""
       });
@@ -1342,13 +1351,7 @@ function syncCreatedCategoryToLaterMonths(createdFund) {
         name: createdFund.name,
         start: 0,
         allocation: 0,
-        target: 0,
-        pinned: false,
-        role: normalizeCategoryRole(createdFund.role),
-        isSubscription: Boolean(createdFund.isSubscription),
-        billingCycle: normalizeBillingCycle(createdFund.billingCycle),
-        expectedAmount: Number(createdFund.expectedAmount || 0),
-        dueDay: createdFund.dueDay ?? null,
+        ...categorySettingsSnapshot(createdFund),
         createdAt: fallbackTimestamp(`${monthId}-01`),
         updatedAt: createdFund.updatedAt || nowStamp()
       };
@@ -4601,8 +4604,7 @@ function createMonthRecord(monthId) {
       name: fund.name,
       start: previousKey ? balanceFor(fund, state.months[previousKey]) : 0,
       allocation: 0,
-      target: Number(fund.target || 0),
-      pinned: Boolean(fund.pinned),
+      ...categorySettingsSnapshot(fund),
       createdAt: fallbackTimestamp(`${monthId}-01`),
       updatedAt: fund.updatedAt || ""
     })),
