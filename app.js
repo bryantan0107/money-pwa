@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.06.29.2";
+const APP_VERSION = "2026.07.06.1";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -255,6 +255,8 @@ const I18N = {
     deleteProjectConfirm: name => `Delete ${name}? This removes the project and its entries.`,
     deleteSettledProjectConfirm: name => `Delete ${name}? This also removes the expense records created when this project was settled.`,
     moveFunds: "Move Between Categories",
+    editMove: "Edit Move",
+    deleteMoveConfirm: "Delete this move? Both category balances will update immediately.",
     allocationChanged: "Allocation changed",
     lastAllocationShort: amount => `Last ${amount}`,
     suggestedAllocationShort: amount => `Suggested ${amount}`,
@@ -521,6 +523,8 @@ const I18N = {
     deleteProjectConfirm: name => `删除 ${name}？这会删除项目和里面的明细。`,
     deleteSettledProjectConfirm: name => `删除 ${name}？这也会删除项目结算时生成的正式支出记录。`,
     moveFunds: "分类间移动",
+    editMove: "编辑移动",
+    deleteMoveConfirm: "删除这笔移动？两个分类的余额会立即更新。",
     allocationChanged: "分配调整",
     lastAllocationShort: amount => `上月 ${amount}`,
     suggestedAllocationShort: amount => `建议 ${amount}`,
@@ -977,7 +981,10 @@ document.querySelector("#detailAddExpenseBtn").addEventListener("click", () => {
   const fund = selectedFund();
   if (fund) openDialog("expense", null, { category: fund.name });
 });
-els.detailMoveBtn.addEventListener("click", () => openDialog("transfer"));
+els.detailMoveBtn.addEventListener("click", () => {
+  const fund = selectedFund();
+  openDialog("transfer", null, fund ? { fromFundId: fund.id } : {});
+});
 els.detailHero.addEventListener("click", event => {
   if (isInteractiveElement(event.target)) return;
   openSelectedCategorySettings();
@@ -1190,6 +1197,9 @@ function normalizeStateLanguage(rawState) {
       event.category = event.category || "";
       event.fromCategory = event.fromCategory || "";
       event.toCategory = event.toCategory || "";
+      event.transferId = event.transferId || "";
+      event.allocationMove = Number.isFinite(Number(event.allocationMove)) ? Number(event.allocationMove) : 0;
+      event.startMove = Number.isFinite(Number(event.startMove)) ? Number(event.startMove) : 0;
       event.note = event.note || "";
       event.amount = Number.isFinite(Number(event.amount)) ? Number(event.amount) : 0;
       event.createdAt = event.createdAt || fallbackTimestamp(event.date);
@@ -1555,7 +1565,7 @@ function balanceFor(fund, month = currentMonth()) {
   return Number(fund.start || 0) + Number(fund.allocation || 0) - expenseTotalFor(fund.name, month);
 }
 
-function addCategoryEvent({ date = defaultEntryDateForCurrentMonth(), type, category, amount, note = "", fromCategory = "", toCategory = "" }) {
+function addCategoryEvent({ date = defaultEntryDateForCurrentMonth(), type, category, amount, note = "", fromCategory = "", toCategory = "", transferId = "", allocationMove = 0, startMove = 0 }) {
   const numericAmount = Number(amount || 0);
   if (!category || !type || numericAmount === 0) return;
 
@@ -1569,6 +1579,9 @@ function addCategoryEvent({ date = defaultEntryDateForCurrentMonth(), type, cate
     category,
     fromCategory,
     toCategory,
+    transferId,
+    allocationMove: Number(allocationMove || 0),
+    startMove: Number(startMove || 0),
     note,
     amount: numericAmount,
     createdAt: stamp,
@@ -2612,14 +2625,19 @@ function renderDetail() {
   els.detailSubscriptionMeta.textContent = subscriptionMetaText(fund);
   els.detailSubscriptionMeta.hidden = !subscriptionMetaText(fund);
   els.detailExpenseTable.innerHTML = records.length
-    ? records.map(record => `
-      <tr class="${record.editable ? "clickable-row" : ""}" ${record.editable ? `data-action="edit-expense" data-id="${record.id}" tabindex="0" aria-label="${escapeAttr(t("editRecord", fund.name, money(Math.abs(record.amount))))}"` : ""}>
+    ? records.map(record => {
+      const editAction = record.editAction || (record.editable ? "edit-expense" : "");
+      const editId = record.editId || record.id;
+      const editAttrs = editAction ? `data-action="${editAction}" data-id="${escapeAttr(editId)}" tabindex="0" aria-label="${escapeAttr(t("editRecord", fund.name, money(Math.abs(record.amount))))}"` : "";
+      return `
+      <tr class="${editAction ? "clickable-row" : ""}" ${editAttrs}>
         <td>${escapeHtml(record.date)}</td>
         <td>${escapeHtml(categoryEventTypeLabel(record.type))}</td>
         <td>${escapeHtml(record.note || "-")}</td>
         <td class="number ${record.amount < 0 ? "is-negative" : "is-positive"}">${signedMoney(record.amount)}</td>
       </tr>
-    `).join("")
+    `;
+    }).join("")
     : `<tr><td colspan="4" class="empty">${t("noExpensesInFund")}</td></tr>`;
 }
 
@@ -2642,10 +2660,13 @@ function categoryRecordsFor(fund) {
   (month.categoryEvents || [])
     .filter(event => event.category === fund.name && event.type !== "expense")
     .forEach(event => {
+      const isEditableTransfer = Boolean(event.transferId) && ["move-in", "move-out"].includes(event.type);
       records.push({
         ...event,
         amount: Number(event.amount || 0),
-        editable: false
+        editable: false,
+        editAction: isEditableTransfer ? "edit-transfer" : "",
+        editId: isEditableTransfer ? event.transferId : event.id
       });
     });
 
@@ -2665,6 +2686,29 @@ function categoryRecordsFor(fund) {
     });
 
   return records;
+}
+
+function findTransferPair(transferId, month = currentMonth()) {
+  if (!transferId) return null;
+  const events = Array.isArray(month.categoryEvents) ? month.categoryEvents : [];
+  const transferEvents = events.filter(event => event.transferId === transferId && ["move-in", "move-out"].includes(event.type));
+  const outEvent = transferEvents.find(event => event.type === "move-out");
+  const inEvent = transferEvents.find(event => event.type === "move-in");
+  if (!outEvent || !inEvent) return null;
+
+  const fromFund = month.funds.find(fund => fund.name === outEvent.category);
+  const toFund = month.funds.find(fund => fund.name === inEvent.category);
+  if (!fromFund || !toFund) return null;
+
+  return {
+    transferId,
+    outEvent,
+    inEvent,
+    fromFund,
+    toFund,
+    amount: Math.abs(Number(outEvent.amount || 0)),
+    date: outEvent.date || inEvent.date || defaultEntryDateForCurrentMonth()
+  };
 }
 
 function compareDetailRecords(a, b) {
@@ -3091,12 +3135,13 @@ document.body.addEventListener("click", event => {
   if (action === "edit-fund") openDialog("fund", id);
   if (action === "delete-fund") removeItem("funds", id);
   if (action === "edit-expense") openDialog("expense", id);
+  if (action === "edit-transfer") openDialog("transfer", id);
   if (action === "edit-project-entry" && selectedProject()?.status !== "settled") openDialog("projectEntry", id);
   if (action === "sort-detail-expenses") toggleDetailExpenseSort(button.dataset.field);
 });
 
 document.body.addEventListener("keydown", event => {
-  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-project-entry'], .clickable-row[data-action='edit-inline-allocation']");
+  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-transfer'], .clickable-row[data-action='edit-project-entry'], .clickable-row[data-action='edit-inline-allocation']");
   if (!row || !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
   if (row.dataset.action === "edit-inline-allocation") {
@@ -3104,6 +3149,10 @@ document.body.addEventListener("keydown", event => {
     return;
   }
   if (row.dataset.action === "edit-project-entry" && selectedProject()?.status === "settled") return;
+  if (row.dataset.action === "edit-transfer") {
+    openDialog("transfer", row.dataset.id);
+    return;
+  }
   openDialog(row.dataset.kind || (row.dataset.action === "edit-project-entry" ? "projectEntry" : "expense"), row.dataset.id);
 });
 
@@ -3311,15 +3360,19 @@ function openDialog(mode, id = null, defaults = {}) {
     projectEntry: id ? t("editProjectEntry") : t("addProjectEntry"),
     allocation: t("allocateIncome"),
     quickAllocate: t("allocateIncome"),
-    transfer: t("moveFunds"),
+    transfer: id ? t("editMove") : t("moveFunds"),
     categoryRole: t("editCategorySettings"),
     fixedBill: t("markFixedBillPaid")
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
-  const canDelete = ["expense", "project", "fund", "categoryRole"].includes(mode) && Boolean(id) && !(mode === "project" && item?.status === "settled");
+  const canDelete = (
+    ["expense", "project", "fund", "categoryRole"].includes(mode) &&
+    Boolean(id) &&
+    !(mode === "project" && item?.status === "settled")
+  ) || (mode === "transfer" && Boolean(id) && Boolean(findTransferPair(id)));
   els.deleteDialogBtn.hidden = !canDelete;
-  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["fund", "categoryRole"].includes(mode) ? t("delete") : t("deleteExpense");
+  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["fund", "categoryRole", "transfer"].includes(mode) ? t("delete") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
   updateCategoryFixedFields();
   if (!els.dialog.open) {
@@ -3469,15 +3522,38 @@ function fieldTemplates(mode, item) {
   }
 
   if (mode === "transfer") {
+    const transfer = editingId ? findTransferPair(editingId) : null;
+    if (editingId && transfer) {
+      return `
+        ${field(t("date"), "date", transfer.date, "date")}
+        <label class="field">${t("from")}
+          <input type="text" value="${escapeAttr(`${transfer.fromFund.name} · ${money(balanceFor(transfer.fromFund))}`)}" readonly>
+        </label>
+        <label class="field">${t("to")}
+          <input type="text" value="${escapeAttr(`${transfer.toFund.name} · ${money(balanceFor(transfer.toFund))}`)}" readonly>
+        </label>
+        ${field(t("amount"), "amount", transfer.amount.toFixed(2), "number")}
+      `;
+    }
+    const selectedFromId = item.fromFundId || "";
+    const selectedToId = item.toFundId || "";
     const funds = currentMonth().funds
-      .map(fund => `<option value="${fund.id}">${escapeHtml(fund.name)} · ${money(balanceFor(fund))}</option>`)
-      .join("");
+      .map(fund => {
+        const fromSelected = selectedFromId === fund.id ? "selected" : "";
+        const toSelected = selectedToId === fund.id ? "selected" : "";
+        return {
+          from: `<option value="${fund.id}" ${fromSelected}>${escapeHtml(fund.name)} · ${money(balanceFor(fund))}</option>`,
+          to: `<option value="${fund.id}" ${toSelected}>${escapeHtml(fund.name)} · ${money(balanceFor(fund))}</option>`
+        };
+      });
+    const fromOptions = funds.map(option => option.from).join("");
+    const toOptions = funds.map(option => option.to).join("");
     return `
       <label class="field">${t("from")}
-        <select name="fromFundId">${funds}</select>
+        <select name="fromFundId">${fromOptions}</select>
       </label>
       <label class="field">${t("to")}
-        <select name="toFundId">${funds}</select>
+        <select name="toFundId">${toOptions}</select>
       </label>
       ${field(t("amount"), "amount", "", "number")}
     `;
@@ -4014,6 +4090,10 @@ function deleteCurrentDialogItem() {
     deleteCurrentProject();
     return;
   }
+  if (dialogMode === "transfer") {
+    deleteCurrentTransfer();
+    return;
+  }
   if (dialogMode === "fund" || dialogMode === "categoryRole") {
     deleteCurrentCategory();
   }
@@ -4099,6 +4179,30 @@ function deleteCurrentExpense() {
   dialogMode = null;
   editingId = null;
   render();
+}
+
+function deleteCurrentTransfer() {
+  if (dialogMode !== "transfer" || !editingId) return;
+
+  const month = currentMonth();
+  const pair = findTransferPair(editingId, month);
+  if (!pair) return;
+  if (!window.confirm(t("deleteMoveConfirm"))) return;
+
+  const oldAllocationMove = Number(pair.outEvent.allocationMove || 0);
+  const oldStartMove = Number(pair.outEvent.startMove || 0);
+  const oldAmount = Math.abs(Number(pair.outEvent.amount || 0));
+  const stamp = nowStamp();
+
+  pair.fromFund.allocation = Number(pair.fromFund.allocation || 0) + oldAllocationMove;
+  pair.fromFund.start = Number(pair.fromFund.start || 0) + oldStartMove;
+  removeFromCategoryBalance(pair.toFund, oldAmount);
+  pair.fromFund.updatedAt = stamp;
+  pair.toFund.updatedAt = stamp;
+  month.categoryEvents = (month.categoryEvents || []).filter(event => event.transferId !== pair.transferId);
+  dialogMode = null;
+  editingId = null;
+  finishBalanceMutation();
 }
 
 function deleteCurrentProject() {
@@ -4286,9 +4390,23 @@ function saveQuickAllocate(data) {
   finishBalanceMutation();
 }
 
+function removeFromCategoryBalance(fund, amount) {
+  const allocationPart = Math.min(Math.max(0, Number(fund.allocation || 0)), amount);
+  const startPart = amount - allocationPart;
+  fund.allocation = Number(fund.allocation || 0) - allocationPart;
+  fund.start = Number(fund.start || 0) - startPart;
+}
+
 function transferAllocation(data) {
   const amount = parseMoneyInput(data.amount);
   const month = currentMonth();
+  const transferPair = editingId ? findTransferPair(editingId, month) : null;
+
+  if (editingId) {
+    updateTransferAllocation(transferPair, data, amount);
+    return;
+  }
+
   const fromFund = month.funds.find(item => item.id === data.fromFundId);
   const toFund = month.funds.find(item => item.id === data.toFundId);
 
@@ -4298,7 +4416,7 @@ function transferAllocation(data) {
   }
 
   const fromAvailable = balanceFor(fromFund);
-  if (amount > fromAvailable) {
+  if (moneyCents(amount) > moneyCents(fromAvailable)) {
     alert(t("moveLimit", money(fromAvailable), fromFund.name));
     return;
   }
@@ -4307,8 +4425,9 @@ function transferAllocation(data) {
     showToast(t("fixedMoveReminder"));
   }
 
-  const allocationMove = Math.min(Number(fromFund.allocation || 0), amount);
+  const allocationMove = Math.min(Math.max(0, Number(fromFund.allocation || 0)), amount);
   const startMove = amount - allocationMove;
+  const transferId = crypto.randomUUID();
   fromFund.allocation = Number(fromFund.allocation || 0) - allocationMove;
   toFund.allocation = Number(toFund.allocation || 0) + allocationMove;
   fromFund.start = Number(fromFund.start || 0) - startMove;
@@ -4320,6 +4439,9 @@ function transferAllocation(data) {
     category: fromFund.name,
     fromCategory: fromFund.name,
     toCategory: toFund.name,
+    transferId,
+    allocationMove,
+    startMove,
     amount: -amount,
     note: t("toCategoryNote", toFund.name)
   });
@@ -4328,8 +4450,83 @@ function transferAllocation(data) {
     category: toFund.name,
     fromCategory: fromFund.name,
     toCategory: toFund.name,
+    transferId,
+    allocationMove,
+    startMove,
     amount,
     note: t("fromCategoryNote", fromFund.name)
+  });
+  finishBalanceMutation();
+}
+
+function updateTransferAllocation(pair, data, amount) {
+  if (!pair || amount === null || amount <= 0) {
+    alert(t("validTransfer"));
+    return;
+  }
+
+  const { fromFund, toFund, outEvent, inEvent } = pair;
+  const previous = {
+    fromAllocation: Number(fromFund.allocation || 0),
+    fromStart: Number(fromFund.start || 0),
+    toAllocation: Number(toFund.allocation || 0),
+    toStart: Number(toFund.start || 0)
+  };
+  const oldAllocationMove = Number(outEvent.allocationMove || 0);
+  const oldStartMove = Number(outEvent.startMove || 0);
+  const oldAmount = Math.abs(Number(outEvent.amount || 0));
+
+  fromFund.allocation = previous.fromAllocation + oldAllocationMove;
+  fromFund.start = previous.fromStart + oldStartMove;
+  removeFromCategoryBalance(toFund, oldAmount);
+
+  const restoredAvailable = balanceFor(fromFund);
+  if (moneyCents(amount) > moneyCents(restoredAvailable)) {
+    fromFund.allocation = previous.fromAllocation;
+    fromFund.start = previous.fromStart;
+    toFund.allocation = previous.toAllocation;
+    toFund.start = previous.toStart;
+    alert(t("moveLimit", money(restoredAvailable), fromFund.name));
+    return;
+  }
+
+  if (normalizeCategoryRole(fromFund.role) === "fixed" && moneyCents(amount) > moneyCents(oldAmount)) {
+    showToast(t("fixedMoveReminder"));
+  }
+
+  const allocationMove = Math.min(Math.max(0, Number(fromFund.allocation || 0)), amount);
+  const startMove = amount - allocationMove;
+  const date = data.date || pair.date;
+  const stamp = nowStamp();
+
+  fromFund.allocation = Number(fromFund.allocation || 0) - allocationMove;
+  fromFund.start = Number(fromFund.start || 0) - startMove;
+  toFund.allocation = Number(toFund.allocation || 0) + allocationMove;
+  toFund.start = Number(toFund.start || 0) + startMove;
+  fromFund.updatedAt = stamp;
+  toFund.updatedAt = stamp;
+
+  Object.assign(outEvent, {
+    date,
+    category: fromFund.name,
+    fromCategory: fromFund.name,
+    toCategory: toFund.name,
+    allocationMove,
+    startMove,
+    amount: -amount,
+    note: t("toCategoryNote", toFund.name),
+    updatedAt: stamp
+  });
+  Object.assign(inEvent, {
+    date,
+    category: toFund.name,
+    fromCategory: fromFund.name,
+    toCategory: toFund.name,
+    allocationMove,
+    startMove,
+    amount,
+    note: t("fromCategoryNote", fromFund.name),
+    updatedAt: stamp
   });
   finishBalanceMutation();
 }
