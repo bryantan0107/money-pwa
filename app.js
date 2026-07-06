@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.07.06.6";
+const APP_VERSION = "2026.07.06.7";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -3082,6 +3082,7 @@ function renderProjectPlan(project) {
   setProjectPlanMode(projectPlanMode, { skipSave: true });
   renderProjectPlanNotes(project);
   renderProjectDailyPlan(project);
+  updateProjectPlanActionVisibility();
 }
 
 function setProjectPlanMode(mode, options = {}) {
@@ -3104,14 +3105,18 @@ function setProjectPlanMode(mode, options = {}) {
   els.projectPlanNotesPanel.hidden = nextMode !== "notes";
   els.projectPlanDailyPanel.hidden = nextMode !== "daily";
   els.projectPlanEditBtn.hidden = nextMode === "daily";
-  els.projectPlanActions.hidden = nextMode === "notes" && els.projectPlanEditor.hidden;
+  updateProjectPlanActionVisibility();
+}
+
+function updateProjectPlanActionVisibility() {
+  els.projectPlanActions.hidden = projectPlanMode === "notes" && els.projectPlanEditor.hidden;
 }
 
 function renderProjectPlanNotes(project) {
   const text = typeof project.planText === "string" ? project.planText : "";
   els.projectPlanDisplay.hidden = false;
   els.projectPlanEditor.hidden = true;
-  els.projectPlanActions.hidden = true;
+  updateProjectPlanActionVisibility();
   els.projectPlanDisplay.innerHTML = text.trim()
     ? `<div class="project-plan-lines">${renderProjectPlanText(text)}</div>`
     : `<p class="empty compact-empty project-plan-empty">${t("noProjectPlan")}</p>`;
