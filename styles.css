@@ -1674,6 +1674,13 @@ label.field.compact {
   font-weight: 700;
 }
 
+.status-pill.compact {
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .detail-balance .status-pill {
   font-size: 15px;
 }
@@ -1684,6 +1691,11 @@ label.field.compact {
   border-radius: 999px;
   background: var(--green);
   flex: 0 0 auto;
+}
+
+.status-pill.compact i {
+  width: 7px;
+  height: 7px;
 }
 
 .status-pill.is-settled i {
@@ -1874,7 +1886,8 @@ label.field.compact {
 .projects-panel .panel-title,
 .detail-view .expense-panel .panel-title,
 .project-breakdown-panel .panel-title,
-.project-entries-panel .panel-title {
+.project-entries-panel .panel-title,
+.project-plan-panel .panel-title {
   border-bottom: 0;
 }
 
@@ -3733,5 +3746,195 @@ menu .dialog-delete-btn {
   .allocation-editor-table th:first-child,
   .allocation-editor-table td:first-child {
     width: 38%;
+  }
+}
+
+
+.project-detail-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: -4px 12px 12px;
+}
+
+.project-detail-tabs button {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#projectDetailView [data-project-panel][hidden] {
+  display: none;
+}
+
+.project-plan-mode {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 18px 14px;
+}
+
+.project-plan-title-actions {
+  align-items: center;
+  gap: 8px;
+}
+
+.project-plan-mode.compact {
+  width: auto;
+  min-width: 148px;
+  margin: 0;
+  padding: 4px;
+}
+
+.project-plan-mode button {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-plan-mode.compact button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.project-plan-display {
+  padding: 0 18px 18px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.project-plan-empty {
+  margin: 0;
+}
+
+.project-plan-lines {
+  display: grid;
+  gap: 2px;
+}
+
+.project-plan-line {
+  min-height: 1.35em;
+  white-space: pre-wrap;
+}
+
+.project-plan-date-line {
+  margin-top: 10px;
+  font-weight: 760;
+}
+
+.project-plan-line:first-child {
+  margin-top: 0;
+}
+
+.project-plan-editor {
+  padding: 0 18px 18px;
+}
+
+.project-plan-editor textarea {
+  width: 100%;
+  min-height: 260px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.project-plan-daily {
+  padding: 0 18px 18px;
+}
+
+.project-day-list {
+  display: grid;
+  gap: 10px;
+}
+
+.project-day-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.project-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.project-day-head div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.project-day-head strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.project-day-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-day-card textarea {
+  width: 100%;
+  min-height: 108px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.project-plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 18px 18px;
+  margin-top: 12px;
+}
+
+.project-plan-actions[hidden] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .project-detail-tabs {
+    margin: -2px 0 12px;
+  }
+
+  .project-plan-mode {
+    margin-inline: 12px;
+  }
+
+  .project-plan-mode.compact {
+    min-width: 136px;
+    margin: 0;
+  }
+
+  .project-plan-mode.compact button {
+    min-height: 30px;
+    padding-inline: 8px;
+  }
+
+  .project-plan-display,
+  .project-plan-editor,
+  .project-plan-daily {
+    padding-inline: 12px;
+  }
+
+  .project-plan-actions {
+    padding-inline: 12px;
   }
 }

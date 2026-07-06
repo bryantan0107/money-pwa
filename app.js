@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.07.06.1";
+const APP_VERSION = "2026.07.06.6";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -46,6 +46,13 @@ const I18N = {
     want: "Want",
     necessity: "Necessity",
     overview: "Overview",
+    plan: "Plan",
+    noProjectPlan: "No plan yet.",
+    projectPlanPlaceholder: "Write notes, itinerary, or plans",
+    projectPlanNotes: "Notes",
+    projectPlanDaily: "Daily",
+    projectDailyPlanPlaceholder: "Write this day’s plan",
+    noProjectDateRange: "Set project dates to use daily plans.",
     structureLine: (amount, percent) => `${amount} · ${percent}%`,
     subscriptionInline: (amount, count) => `Subscriptions ${amount} · ${count}`,
     savedToast: "Saved",
@@ -314,6 +321,13 @@ const I18N = {
     want: "想要",
     necessity: "必要性",
     overview: "总览",
+    plan: "计划",
+    noProjectPlan: "还没有计划。",
+    projectPlanPlaceholder: "写下备注、行程或计划",
+    projectPlanNotes: "笔记",
+    projectPlanDaily: "按日期",
+    projectDailyPlanPlaceholder: "写下当天计划",
+    noProjectDateRange: "设置项目日期后可使用按日期计划。",
     structureLine: (amount, percent) => `${amount} · ${percent}%`,
     subscriptionInline: (amount, count) => `其中订阅 ${amount} · ${count} 个`,
     savedToast: "已保存",
@@ -765,6 +779,8 @@ let suppressFundClick = false;
 let availableRoleFilter = "spending";
 let allocationRowEdit = null;
 let moneyStructureMode = "role";
+let projectDetailSection = "records";
+let projectPlanMode = "notes";
 let supabaseClient = null;
 let syncSession = null;
 let syncInFlight = false;
@@ -841,6 +857,21 @@ const els = {
   projectDetailDefaultFund: document.querySelector("#projectDetailDefaultFund"),
   projectDetailDates: document.querySelector("#projectDetailDates"),
   projectDetailMetaBtn: document.querySelector("#projectDetailMetaBtn"),
+  projectDetailTabs: document.querySelector("#projectDetailTabs"),
+  projectOverviewPanel: document.querySelector("#projectOverviewPanel"),
+  projectRecordsPanel: document.querySelector("#projectRecordsPanel"),
+  projectPlanPanel: document.querySelector("#projectPlanPanel"),
+  projectPlanModeToggle: document.querySelector("#projectPlanModeToggle"),
+  projectPlanNotesPanel: document.querySelector("#projectPlanNotesPanel"),
+  projectPlanDailyPanel: document.querySelector("#projectPlanDailyPanel"),
+  projectDailyPlanList: document.querySelector("#projectDailyPlanList"),
+  projectPlanDisplay: document.querySelector("#projectPlanDisplay"),
+  projectPlanEditor: document.querySelector("#projectPlanEditor"),
+  projectPlanActions: document.querySelector("#projectPlanActions"),
+  projectPlanTextarea: document.querySelector("#projectPlanTextarea"),
+  projectPlanEditBtn: document.querySelector("#projectPlanEditBtn"),
+  projectPlanSaveBtn: document.querySelector("#projectPlanSaveBtn"),
+  projectPlanCancelBtn: document.querySelector("#projectPlanCancelBtn"),
   projectBreakdownBar: document.querySelector("#projectBreakdownBar"),
   projectBreakdownList: document.querySelector("#projectBreakdownList"),
   projectEntriesList: document.querySelector("#projectEntriesList"),
@@ -1010,6 +1041,19 @@ els.projectDetailMetaBtn.addEventListener("click", () => {
   const project = selectedProject();
   if (project) openDialog("project", project.id);
 });
+els.projectDetailTabs.addEventListener("click", event => {
+  const tab = event.target.closest("[data-project-section]");
+  if (!tab) return;
+  setProjectDetailSection(tab.dataset.projectSection);
+});
+els.projectPlanModeToggle.addEventListener("click", event => {
+  const button = event.target.closest("[data-project-plan-mode]");
+  if (!button) return;
+  setProjectPlanMode(button.dataset.projectPlanMode);
+});
+els.projectPlanEditBtn.addEventListener("click", startProjectPlanEdit);
+els.projectPlanCancelBtn.addEventListener("click", cancelProjectPlanEdit);
+els.projectPlanSaveBtn.addEventListener("click", saveProjectPlan);
 els.deleteProjectBtn.addEventListener("click", deleteSelectedProject);
 els.settleProjectBtn.addEventListener("click", settleOrReopenProject);
 els.updateNowBtn.addEventListener("click", activateWaitingServiceWorker);
@@ -1154,6 +1198,9 @@ function normalizeStateLanguage(rawState) {
     project.startMonth = normalizeProjectStartMonth(project, rawState.currentMonth);
     project.createdAt = project.createdAt || fallbackTimestamp(project.startDate || `${project.monthId || rawState.currentMonth}-01`);
     project.updatedAt = project.updatedAt || project.createdAt;
+    project.planText = typeof project.planText === "string" ? project.planText : "";
+    project.planMode = project.planMode === "daily" ? "daily" : "notes";
+    project.dailyPlans = normalizeProjectDailyPlans(project.dailyPlans);
     project.entries = Array.isArray(project.entries) ? project.entries : [];
     project.settlementExpenseIds = Array.isArray(project.settlementExpenseIds) ? project.settlementExpenseIds : [];
     project.defaultCategory = project.defaultCategory || "";
@@ -1921,8 +1968,17 @@ function renderStaticLanguage() {
   els.deleteDialogBtn.textContent = t("deleteExpense");
   document.querySelector("#prevYearBtn").setAttribute("aria-label", t("previousYear"));
   document.querySelector("#nextYearBtn").setAttribute("aria-label", t("nextYear"));
-  document.querySelector(".project-breakdown-panel h2").textContent = t("fundBreakdown");
-  document.querySelector(".project-entries-panel h2").textContent = t("entries");
+  document.querySelector("#projectOverviewPanel h2").textContent = t("fundBreakdown");
+  document.querySelector("#projectRecordsPanel h2").textContent = t("entries");
+  document.querySelector("#projectPlanPanel h2").textContent = t("plan");
+  els.projectPlanModeToggle.querySelector("[data-project-plan-mode=\"notes\"]").textContent = t("projectPlanNotes");
+  els.projectPlanModeToggle.querySelector("[data-project-plan-mode=\"daily\"]").textContent = t("projectPlanDaily");
+  els.projectDetailTabs.querySelector("[data-project-section=\"records\"]").textContent = t("records");
+  els.projectDetailTabs.querySelector("[data-project-section=\"plan\"]").textContent = t("plan");
+  els.projectPlanEditBtn.textContent = t("edit");
+  els.projectPlanSaveBtn.textContent = t("save");
+  els.projectPlanCancelBtn.textContent = t("cancel");
+  els.projectPlanTextarea.placeholder = t("projectPlanPlaceholder");
   els.deleteProjectBtn.textContent = t("deleteProject");
   els.addProjectEntryBtn.textContent = t("add");
   document.querySelector(".project-entries-table th:nth-child(1)").textContent = t("date");
@@ -2944,7 +3000,7 @@ function renderProjectCard(project) {
         <span>${escapeHtml(projectDateRange(project))}</span>
         <span>${escapeHtml(defaultFund || "-")}</span>
         <span>${escapeHtml(t("started"))} ${escapeHtml(formatMonthLabel(projectStartMonth(project)))}</span>
-        <span>${project.status === "settled" ? t("settled") : t("active")}</span>
+        <span class="status-pill compact ${project.status === "settled" ? "is-settled" : ""}"><i></i><span>${project.status === "settled" ? t("settled") : t("active")}</span></span>
       </div>
       <div class="mini-breakdown">${renderAllocationBarSegments(breakdown, total)}</div>
     </article>
@@ -2987,6 +3043,9 @@ function renderProjectDetail() {
   els.settleProjectBtn.classList.toggle("primary-action", !isSettled);
   els.settleProjectBtn.classList.toggle("secondary-action", isSettled);
 
+  renderProjectPlan(project);
+  setProjectDetailSection(projectDetailSection);
+
   els.projectEntriesList.innerHTML = entries.length
     ? entries.map(entry => {
       const categoryName = projectEntryCategoryName(entry, project) || t("other");
@@ -3000,6 +3059,180 @@ function renderProjectDetail() {
     `;
     }).join("")
     : `<tr><td colspan="4" class="empty">${isSettled ? t("projectSettledNote") : t("noProjectEntries")}</td></tr>`;
+}
+
+function setProjectDetailSection(section = projectDetailSection) {
+  const allowed = new Set(["records", "plan"]);
+  projectDetailSection = allowed.has(section) ? section : "records";
+  els.projectDetailTabs.querySelectorAll("[data-project-section]").forEach(tab => {
+    const active = tab.dataset.projectSection === projectDetailSection;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-pressed", String(active));
+  });
+  const showRecords = projectDetailSection === "records";
+  els.projectOverviewPanel.hidden = !showRecords;
+  els.projectRecordsPanel.hidden = !showRecords;
+  els.projectPlanPanel.hidden = projectDetailSection !== "plan";
+}
+
+function renderProjectPlan(project) {
+  project.planMode = project.planMode === "daily" ? "daily" : "notes";
+  project.dailyPlans = normalizeProjectDailyPlans(project.dailyPlans);
+  projectPlanMode = project.planMode;
+  setProjectPlanMode(projectPlanMode, { skipSave: true });
+  renderProjectPlanNotes(project);
+  renderProjectDailyPlan(project);
+}
+
+function setProjectPlanMode(mode, options = {}) {
+  const nextMode = mode === "daily" ? "daily" : "notes";
+  projectPlanMode = nextMode;
+  const project = selectedProject();
+  if (project) {
+    project.planMode = nextMode;
+    if (!options.skipSave) {
+      project.updatedAt = nowStamp();
+      markFinancialDirty();
+      saveState();
+    }
+  }
+  els.projectPlanModeToggle.querySelectorAll("[data-project-plan-mode]").forEach(button => {
+    const active = button.dataset.projectPlanMode === nextMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  els.projectPlanNotesPanel.hidden = nextMode !== "notes";
+  els.projectPlanDailyPanel.hidden = nextMode !== "daily";
+  els.projectPlanEditBtn.hidden = nextMode === "daily";
+  els.projectPlanActions.hidden = nextMode === "notes" && els.projectPlanEditor.hidden;
+}
+
+function renderProjectPlanNotes(project) {
+  const text = typeof project.planText === "string" ? project.planText : "";
+  els.projectPlanDisplay.hidden = false;
+  els.projectPlanEditor.hidden = true;
+  els.projectPlanActions.hidden = true;
+  els.projectPlanDisplay.innerHTML = text.trim()
+    ? `<div class="project-plan-lines">${renderProjectPlanText(text)}</div>`
+    : `<p class="empty compact-empty project-plan-empty">${t("noProjectPlan")}</p>`;
+  els.projectPlanTextarea.value = text;
+}
+
+function renderProjectDailyPlan(project) {
+  const days = projectPlanDays(project);
+  if (!days.length) {
+    els.projectDailyPlanList.innerHTML = `<p class="empty compact-empty project-plan-empty">${t("noProjectDateRange")}</p>`;
+    return;
+  }
+  const plans = dailyPlanMap(project);
+  els.projectDailyPlanList.innerHTML = days.map((date, index) => {
+    const plan = plans.get(date) || { date, note: "" };
+    const note = plan.note || "";
+    return `
+      <article class="project-day-card">
+        <div class="project-day-head">
+          <div>
+            <strong>${escapeHtml(formatShortDate(date))}</strong>
+            <span>Day ${index + 1}</span>
+          </div>
+        </div>
+        <textarea data-project-day="${escapeAttr(date)}" rows="4" placeholder="${escapeAttr(t("projectDailyPlanPlaceholder"))}">${escapeHtml(note)}</textarea>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderProjectPlanText(text) {
+  return String(text).split(/\r?\n/).map(line => {
+    const className = isProjectPlanDateHeading(line.trim())
+      ? "project-plan-line project-plan-date-line"
+      : "project-plan-line";
+    return `<div class="${className}">${line ? escapeHtml(line) : "&nbsp;"}</div>`;
+  }).join("");
+}
+
+function isProjectPlanDateHeading(value) {
+  return /^(\d{1,2}[.\/-]\d{1,2}([.\/-]\d{2,4})?|\d{4}[.\/-]\d{1,2}[.\/-]\d{1,2})$/.test(value);
+}
+
+function normalizeProjectDailyPlans(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .map(item => ({
+      date: typeof item?.date === "string" ? item.date : "",
+      note: typeof item?.note === "string" ? item.note : ""
+    }))
+    .filter(item => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date) || seen.has(item.date)) return false;
+      seen.add(item.date);
+      return true;
+    });
+}
+
+function dailyPlanMap(project) {
+  return new Map(normalizeProjectDailyPlans(project.dailyPlans).map(plan => [plan.date, plan]));
+}
+
+function projectPlanDays(project) {
+  if (!project?.startDate || !project?.endDate) return [];
+  const start = parseLocalDate(project.startDate);
+  const end = parseLocalDate(project.endDate);
+  if (!start || !end || start > end) return [];
+  const days = [];
+  const cursor = new Date(start);
+  while (cursor <= end && days.length < 62) {
+    days.push(localDateId(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
+
+function parseLocalDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startProjectPlanEdit() {
+  const project = selectedProject();
+  if (!project) return;
+  els.projectPlanTextarea.value = project.planText || "";
+  els.projectPlanDisplay.hidden = true;
+  els.projectPlanEditor.hidden = false;
+  els.projectPlanActions.hidden = false;
+  requestAnimationFrame(() => els.projectPlanTextarea.focus());
+}
+
+function cancelProjectPlanEdit() {
+  const project = selectedProject();
+  if (project) renderProjectPlan(project);
+}
+
+function saveProjectPlan() {
+  const project = selectedProject();
+  if (!project) return;
+  if (projectPlanMode === "daily") {
+    els.projectPlanActions.hidden = false;
+    const existing = dailyPlanMap(project);
+    els.projectDailyPlanList.querySelectorAll("[data-project-day]").forEach(input => {
+      const date = input.dataset.projectDay;
+      const note = input.value.trimEnd();
+      if (note || existing.has(date)) existing.set(date, { date, note });
+    });
+    project.dailyPlans = [...existing.values()]
+      .filter(plan => plan.note.trim())
+      .sort((a, b) => a.date.localeCompare(b.date));
+  } else {
+    project.planText = els.projectPlanTextarea.value.trimEnd();
+  }
+  project.planMode = projectPlanMode;
+  project.updatedAt = nowStamp();
+  projectDetailSection = "plan";
+  markFinancialDirty();
+  saveState();
+  render();
+  showToast(t("savedToast"));
 }
 
 function projectTotal(project) {
@@ -4556,6 +4789,9 @@ function saveProject(data) {
       monthId: state.currentMonth,
       startMonth: state.currentMonth,
       status: "active",
+      planText: "",
+      planMode: "notes",
+      dailyPlans: [],
       entries: [],
       settlementExpenseIds: [],
       createdAt: nowStamp(),

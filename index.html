@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=transfer-delete-default-from-1">
+    <link rel="stylesheet" href="styles.css?v=project-plan-toggle-1">
   </head>
   <body>
     <div class="app-shell">
@@ -374,7 +374,12 @@
             </div>
           </section>
 
-          <section class="panel project-breakdown-panel">
+          <div id="projectDetailTabs" class="project-detail-tabs segmented-control" role="tablist" aria-label="Project sections">
+            <button type="button" data-project-section="records" class="active" aria-pressed="true">Records</button>
+            <button type="button" data-project-section="plan" aria-pressed="false">Plan</button>
+          </div>
+
+          <section id="projectOverviewPanel" class="panel project-breakdown-panel" data-project-panel="overview">
             <div class="panel-title compact-title">
               <h2>Category Breakdown</h2>
             </div>
@@ -382,7 +387,7 @@
             <div id="projectBreakdownList" class="project-breakdown-list"></div>
           </section>
 
-          <section class="panel project-entries-panel">
+          <section id="projectRecordsPanel" class="panel project-entries-panel" data-project-panel="records">
             <div class="panel-title">
               <h2>Entries</h2>
               <div class="inline-actions">
@@ -401,6 +406,32 @@
                 </thead>
                 <tbody id="projectEntriesList"></tbody>
               </table>
+            </div>
+          </section>
+
+          <section id="projectPlanPanel" class="panel project-plan-panel" data-project-panel="plan" hidden>
+            <div class="panel-title">
+              <h2>Plan</h2>
+              <div class="inline-actions project-plan-title-actions">
+                <div id="projectPlanModeToggle" class="project-plan-mode compact segmented-control" role="tablist" aria-label="Plan mode">
+                  <button type="button" data-project-plan-mode="notes" class="active" aria-pressed="true">Notes</button>
+                  <button type="button" data-project-plan-mode="daily" aria-pressed="false">Daily</button>
+                </div>
+                <button id="projectPlanEditBtn" class="secondary-action" type="button">Edit</button>
+              </div>
+            </div>
+            <div id="projectPlanNotesPanel">
+              <div id="projectPlanDisplay" class="project-plan-display"></div>
+              <div id="projectPlanEditor" class="project-plan-editor" hidden>
+                <textarea id="projectPlanTextarea" rows="12" placeholder="Write notes, itinerary, or plans"></textarea>
+              </div>
+            </div>
+            <div id="projectPlanDailyPanel" class="project-plan-daily" hidden>
+              <div id="projectDailyPlanList" class="project-day-list"></div>
+            </div>
+            <div id="projectPlanActions" class="project-plan-actions" hidden>
+              <button id="projectPlanCancelBtn" class="secondary-action" type="button">Cancel</button>
+              <button id="projectPlanSaveBtn" class="primary-action" type="button">Save</button>
             </div>
           </section>
         </section>
@@ -441,6 +472,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="sync-config.js?v=category-metadata-1"></script>
-    <script src="app.js?v=transfer-delete-default-from-1"></script>
+    <script src="app.js?v=project-plan-toggle-1"></script>
   </body>
 </html>
