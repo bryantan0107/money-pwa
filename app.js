@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.07.06.7";
+const APP_VERSION = "2026.07.07.1";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -1555,6 +1555,13 @@ function formatShortDate(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString(currentLanguage() === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" });
+}
+
+function formatWeekdayShort(value) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(currentLanguage() === "zh" ? "zh-CN" : "en-US", { weekday: "short" });
 }
 
 function formatRealMonthId() {
@@ -3138,6 +3145,7 @@ function renderProjectDailyPlan(project) {
         <div class="project-day-head">
           <div>
             <strong>${escapeHtml(formatShortDate(date))}</strong>
+            <span>${escapeHtml(formatWeekdayShort(date))}</span>
             <span>Day ${index + 1}</span>
           </div>
         </div>
