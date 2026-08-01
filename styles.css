@@ -1569,6 +1569,157 @@ label.field.compact {
   box-shadow: none;
 }
 
+.records-mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 22px 14px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-alt);
+}
+
+.records-mode-toggle button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.records-mode-toggle button[aria-pressed="true"] {
+  background: var(--surface-solid);
+  color: var(--blue);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.restock-records-panel {
+  padding: 0 22px 24px;
+}
+
+.restock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.restock-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.restock-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.restock-group-title h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.restock-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-solid);
+  cursor: pointer;
+}
+
+.restock-card:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.restock-card h3 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.restock-card p {
+  margin: 0;
+}
+
+.restock-group-label,
+.restock-meta,
+.restock-note {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.restock-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.restock-note {
+  margin-top: 6px;
+}
+
+.restock-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+}
+
+.restock-status {
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--surface-alt);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.restock-status.overdue {
+  background: rgba(215, 0, 21, 0.08);
+  color: var(--red);
+}
+
+.restock-status.due {
+  background: rgba(191, 91, 0, 0.1);
+  color: var(--orange);
+}
+
+.restock-status.later {
+  background: rgba(36, 138, 61, 0.08);
+  color: var(--green);
+}
+
+.restock-mark-btn {
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 14px;
+}
+
+.restock-empty {
+  margin: 0;
+  padding: 28px 4px;
+  color: var(--muted);
+}
+
 .records-table .income-row .number {
   color: var(--green);
   font-weight: 700;
@@ -3727,6 +3878,23 @@ menu .dialog-delete-btn {
 
   .records-panel .clickable-row:active {
     background: rgba(0, 113, 227, 0.08);
+  }
+
+  .records-mode-toggle {
+    margin: 0 10px 12px;
+  }
+
+  .restock-records-panel {
+    padding: 0 10px 18px;
+  }
+
+  .restock-card {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .restock-card-side {
+    align-items: flex-start;
   }
 
   .quick-allocation-grid {

@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=project-plan-weekday-1">
+    <link rel="stylesheet" href="styles.css?v=restock-records-1">
   </head>
   <body>
     <div class="app-shell">
@@ -131,6 +131,10 @@
                 </div>
               </div>
             </div>
+            <div id="recordsModeToggle" class="records-mode-toggle" role="group" aria-label="Records view">
+              <button type="button" data-records-mode="ledger" aria-pressed="true">Ledger</button>
+              <button type="button" data-records-mode="restock" aria-pressed="false">Restock</button>
+            </div>
             <div class="record-actions">
               <label class="record-search" aria-label="Search records">
                 <input id="recordSearchInput" type="search" placeholder="Search records" autocomplete="off">
@@ -139,18 +143,23 @@
                 <button id="recordFilterBtn" class="record-filter-btn" type="button" aria-expanded="false">Filter</button>
               </div>
             </div>
-            <div class="table-wrap">
-              <table class="records-table compact-data-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Category</th>
-                    <th>Note</th>
-                    <th class="number">Amount</th>
-                  </tr>
-                </thead>
-                <tbody id="recordTable"></tbody>
-              </table>
+            <div id="ledgerRecordsPanel" class="ledger-records-panel">
+              <div class="table-wrap">
+                <table class="records-table compact-data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Category</th>
+                      <th>Note</th>
+                      <th class="number">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recordTable"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="restockRecordsPanel" class="restock-records-panel" hidden>
+              <div id="restockList" class="restock-list"></div>
             </div>
           </section>
           <div id="recordFilterPanel" class="record-filter-panel" hidden></div>
@@ -472,6 +481,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="sync-config.js?v=category-metadata-1"></script>
-    <script src="app.js?v=project-plan-weekday-1"></script>
+    <script src="app.js?v=restock-records-1"></script>
   </body>
 </html>

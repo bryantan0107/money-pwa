@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.07.07.1";
+const APP_VERSION = "2026.07.17.1";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -138,7 +138,10 @@ const I18N = {
     event: "Event",
     shopping: "Shopping",
     moving: "Moving",
+    ledger: "Ledger",
+    restock: "Restock",
     searchRecords: "Search records",
+    searchRestock: "Search restock",
     allRecords: "All Records",
     type: "Type",
     expenseFunds: "Expense Categories",
@@ -238,6 +241,26 @@ const I18N = {
     filter: "Filter",
     noFunds: "No categories yet.",
     noMatchingRecords: "No matching records.",
+    noRestockItems: "No restock items yet.",
+    noMatchingRestock: "No matching restock items.",
+    addRestockItem: "Add Restock Item",
+    editRestockItem: "Edit Restock Item",
+    itemName: "Item name",
+    restockGroup: "Group",
+    lastBoughtDate: "Last bought date",
+    intervalDays: "Interval days",
+    restockNote: "Note",
+    dueSoon: "Due soon",
+    laterRestock: "Later",
+    noSchedule: "No schedule",
+    markBought: "Mark bought",
+    lastBought: "Last bought",
+    notSet: "Not set",
+    everyDays: days => `Every ${days} days`,
+    nextDate: date => `Next ${date}`,
+    overdueDays: days => `${days} day${days === 1 ? "" : "s"} overdue`,
+    dueToday: "Due today",
+    dueInDays: days => `Due in ${days} day${days === 1 ? "" : "s"}`,
     noExpensesInFund: "No records in this category yet.",
     noMatchingFund: "No matching category found.",
     noFundAccounts: "No categories yet.",
@@ -254,6 +277,7 @@ const I18N = {
     editExpense: "Edit Expense",
     deleteExpense: "Delete",
     deleteExpenseConfirm: "Delete this expense? Balances will update immediately.",
+    deleteRestockConfirm: name => `Delete ${name}?`,
     deleteSettledProjectExpenseConfirm: "This expense was created by a project settlement. Delete it anyway? It will be removed from that settlement link.",
     allocateIncome: "Allocate Income",
     deleteCategoryConfirm: name => `Delete ${name} from this month onward? The category card will be removed from this month and later months, but historical records before this month will stay unchanged.`,
@@ -285,6 +309,8 @@ const I18N = {
     backupRecent: days => `Last backup was ${days} days ago. Save a backup file to iCloud Drive for peace of mind.`,
     backupNever: "No backup yet. Export one and save it to iCloud Drive.",
     validAmount: "Please enter a valid amount.",
+    validRestockName: "Enter an item name.",
+    validRestockInterval: "Interval must be a positive number.",
     validQuickAllocate: "Enter an amount within your unallocated income.",
     validQuickAdd: "Enter a valid quick add amount.",
     validAllocations: "Please enter valid allocation amounts.",
@@ -413,7 +439,10 @@ const I18N = {
     event: "活动",
     shopping: "购物",
     moving: "搬家",
+    ledger: "流水",
+    restock: "补货",
     searchRecords: "搜索记录",
+    searchRestock: "搜索补货",
     allRecords: "全部记录",
     type: "类型",
     expenseFunds: "支出分类",
@@ -513,6 +542,26 @@ const I18N = {
     filter: "筛选",
     noFunds: "还没有分类。",
     noMatchingRecords: "没有匹配记录。",
+    noRestockItems: "还没有补货项目。",
+    noMatchingRestock: "没有匹配的补货项目。",
+    addRestockItem: "添加补货项目",
+    editRestockItem: "编辑补货项目",
+    itemName: "项目名称",
+    restockGroup: "分组",
+    lastBoughtDate: "上次购买日期",
+    intervalDays: "周期天数",
+    restockNote: "备注",
+    dueSoon: "即将需要",
+    laterRestock: "之后",
+    noSchedule: "未设置周期",
+    markBought: "标记已购买",
+    lastBought: "上次购买",
+    notSet: "未设置",
+    everyDays: days => `每 ${days} 天`,
+    nextDate: date => `下次 ${date}`,
+    overdueDays: days => `已过期 ${days} 天`,
+    dueToday: "今天需要",
+    dueInDays: days => `${days} 天后需要`,
     noExpensesInFund: "这个分类还没有记录。",
     noMatchingFund: "没有匹配分类。",
     noFundAccounts: "还没有分类。",
@@ -529,6 +578,7 @@ const I18N = {
     editExpense: "编辑支出",
     deleteExpense: "删除",
     deleteExpenseConfirm: "删除这笔支出？余额会立即更新。",
+    deleteRestockConfirm: name => `删除 ${name}？`,
     deleteSettledProjectExpenseConfirm: "这笔支出来自项目结算。仍然删除吗？它会从该项目结算记录中移除。",
     allocateIncome: "分配收入",
     deleteCategoryConfirm: name => `从本月开始删除 ${name}？这个分类卡片会从本月和后续月份移除，但本月之前的历史记录会保留。`,
@@ -560,6 +610,8 @@ const I18N = {
     backupRecent: days => `上次备份是 ${days} 天前。建议导出备份并保存到 iCloud Drive。`,
     backupNever: "还没有备份。建议导出一次并保存到 iCloud Drive。",
     validAmount: "请输入有效金额。",
+    validRestockName: "请输入补货项目名称。",
+    validRestockInterval: "周期天数必须是正数。",
     validQuickAllocate: "请输入不超过未分配收入的金额。",
     validQuickAdd: "请输入有效的快速添加金额。",
     validAllocations: "请输入有效的分配金额。",
@@ -693,7 +745,8 @@ const initialData = {
   fundOrder: [],
   backupDirty: false,
   lastBackupAt: null,
-  projects: [],
+    projects: [],
+    restockItems: [],
   months: {
     "2026-05": {
       label: "May 2026",
@@ -759,6 +812,7 @@ const initialData = {
 let state = loadState();
 let dialogMode = null;
 let editingId = null;
+let noteSuggestionsHideTimer = null;
 let selectedFundId = null;
 let selectedProjectId = null;
 let showingAllocationDetail = false;
@@ -766,6 +820,7 @@ let activeTab = "home";
 let detailReturnTab = "home";
 const tabScrollPositions = { home: 0, records: 0, projects: 0, settings: 0 };
 let recordFilterValue = "All";
+let recordsMode = "ledger";
 let detailSwipeStart = null;
 let detailExpenseSort = { field: "date", direction: "desc" };
 let lockedScrollY = 0;
@@ -841,6 +896,10 @@ const els = {
   quickMoveBtn: document.querySelector("#quickMoveBtn"),
   fundList: document.querySelector("#fundList"),
   recordTable: document.querySelector("#recordTable"),
+  recordsModeToggle: document.querySelector("#recordsModeToggle"),
+  ledgerRecordsPanel: document.querySelector("#ledgerRecordsPanel"),
+  restockRecordsPanel: document.querySelector("#restockRecordsPanel"),
+  restockList: document.querySelector("#restockList"),
   recordSearchInput: document.querySelector("#recordSearchInput"),
   recordFilterBtn: document.querySelector("#recordFilterBtn"),
   recordFilterPanel: document.querySelector("#recordFilterPanel"),
@@ -928,7 +987,22 @@ els.allocationInsights.addEventListener("click", event => {
   moneyStructureMode = button.dataset.structureMode === "need" ? "need" : "role";
   renderAllocationDetail();
 });
-els.addRecordBtn.addEventListener("click", toggleAddRecordMenu);
+els.addRecordBtn.addEventListener("click", () => {
+  if (recordsMode === "restock") {
+    closeAddRecordMenu();
+    openDialog("restock");
+    return;
+  }
+  toggleAddRecordMenu();
+});
+els.recordsModeToggle.addEventListener("click", event => {
+  const button = event.target.closest("[data-records-mode]");
+  if (!button) return;
+  recordsMode = button.dataset.recordsMode === "restock" ? "restock" : "ledger";
+  closeAddRecordMenu();
+  closeRecordFilterMenu();
+  renderRecords();
+});
 els.addRecordIncomeBtn.addEventListener("click", () => {
   closeAddRecordMenu();
   openDialog("income");
@@ -1133,9 +1207,17 @@ els.form.addEventListener("change", updateQuickAllocatePreview);
 els.form.addEventListener("change", updateCategoryFixedFields);
 els.form.addEventListener("input", updateNoteAutocomplete);
 els.form.addEventListener("click", applyNoteSuggestion);
+els.form.addEventListener("click", hideNoteSuggestionsOnOutsideClick);
+els.form.addEventListener("focusout", scheduleHideNoteSuggestions);
 els.form.addEventListener("keydown", event => {
-  if (event.key === "Escape") hideNoteSuggestions();
+  if (event.key === "Escape" && isNoteSuggestionsVisible()) {
+    hideNoteSuggestions();
+    event.preventDefault();
+    event.stopPropagation();
+  }
 });
+els.dialog.addEventListener("click", hideNoteSuggestionsOnOutsideClick);
+els.dialog.addEventListener("close", hideNoteSuggestions);
 els.detailView.addEventListener("touchstart", startDetailSwipe, { passive: true });
 els.detailView.addEventListener("touchmove", moveDetailSwipe, { passive: false });
 els.detailView.addEventListener("touchend", finishDetailSwipe, { passive: true });
@@ -1187,6 +1269,9 @@ function normalizeStateLanguage(rawState) {
     lastAction: rawState.cloudSync?.lastAction || null
   };
   if (!Array.isArray(rawState.projects)) rawState.projects = [];
+  rawState.restockItems = Array.isArray(rawState.restockItems)
+    ? rawState.restockItems.map(normalizeRestockItem).filter(Boolean)
+    : [];
   rawState.dataVersion = DATA_VERSION;
   rawState.languageNormalized = true;
   rawState.privacyMode = Boolean(rawState.privacyMode);
@@ -1265,6 +1350,24 @@ function normalizeStateLanguage(rawState) {
 function normalizeProjectStartMonth(project, fallbackMonth) {
   const candidate = project.startMonth || project.monthId || (project.startDate || "").slice(0, 7) || fallbackMonth;
   return /^\d{4}-\d{2}$/.test(candidate) ? candidate : fallbackMonth;
+}
+
+function normalizeRestockItem(item) {
+  if (!item || typeof item !== "object") return null;
+  const name = String(item.name || "").trim();
+  if (!name) return null;
+  const interval = Number(item.intervalDays);
+  const now = nowStamp();
+  return {
+    id: item.id || crypto.randomUUID(),
+    name,
+    group: String(item.group || "").trim(),
+    lastBoughtDate: isDateId(item.lastBoughtDate) ? item.lastBoughtDate : "",
+    intervalDays: Number.isFinite(interval) && interval > 0 ? Math.round(interval) : null,
+    note: String(item.note || "").trim(),
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || item.createdAt || now
+  };
 }
 
 function repairCategoryLifecycleGaps(rawState) {
@@ -1571,6 +1674,29 @@ function formatRealMonthId() {
 
 function localDateId(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function isDateId(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+}
+
+function dateIdToUtcMs(dateId) {
+  if (!isDateId(dateId)) return NaN;
+  const [year, month, day] = dateId.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+function addDaysToDateId(dateId, days) {
+  const timestamp = dateIdToUtcMs(dateId);
+  if (Number.isNaN(timestamp)) return "";
+  return new Date(timestamp + Number(days) * 86400000).toISOString().slice(0, 10);
+}
+
+function daysBetweenDateIds(fromId, toId) {
+  const from = dateIdToUtcMs(fromId);
+  const to = dateIdToUtcMs(toId);
+  if (Number.isNaN(from) || Number.isNaN(to)) return null;
+  return Math.round((to - from) / 86400000);
 }
 
 function defaultEntryDateForCurrentMonth() {
@@ -1902,6 +2028,8 @@ function renderStaticLanguage() {
   els.addFundBtn.setAttribute("aria-label", t("addFund"));
   document.querySelector("#recordsView h2").textContent = t("records");
   els.recordSearchInput.placeholder = t("searchRecords");
+  els.recordsModeToggle.querySelector("[data-records-mode='ledger']").textContent = t("ledger");
+  els.recordsModeToggle.querySelector("[data-records-mode='restock']").textContent = t("restock");
   els.recordFilterBtn.textContent = t("filter");
   els.recordFilterBtn.setAttribute("aria-label", t("filter"));
   els.addRecordBtn.textContent = t("add");
@@ -2829,6 +2957,11 @@ function renderRecordFilter() {
 }
 
 function renderRecords() {
+  renderRecordsModeShell();
+  if (recordsMode === "restock") {
+    renderRestockItems();
+    return;
+  }
   const filter = recordFilterValue || "All";
   const query = els.recordSearchInput.value.trim().toLowerCase();
   const records = unifiedRecords()
@@ -2846,6 +2979,117 @@ function renderRecords() {
       </tr>
     `).join("")
     : `<tr><td colspan="4" class="empty">${t("noMatchingRecords")}</td></tr>`;
+}
+
+function renderRecordsModeShell() {
+  const isRestock = recordsMode === "restock";
+  els.recordsModeToggle.querySelectorAll("[data-records-mode]").forEach(button => {
+    const active = button.dataset.recordsMode === recordsMode;
+    button.setAttribute("aria-pressed", String(active));
+  });
+  els.ledgerRecordsPanel.hidden = isRestock;
+  els.restockRecordsPanel.hidden = !isRestock;
+  const filterMenu = els.recordFilterBtn.closest(".record-filter-menu");
+  if (filterMenu) filterMenu.hidden = isRestock;
+  if (isRestock) closeRecordFilterMenu();
+  const placeholder = isRestock ? t("searchRestock") : t("searchRecords");
+  els.recordSearchInput.placeholder = placeholder;
+  els.recordSearchInput.closest("label")?.setAttribute("aria-label", placeholder);
+  els.addRecordBtn.textContent = t("add");
+  if (isRestock) els.addRecordBtn.setAttribute("aria-expanded", "false");
+}
+
+function restockSearchBlob(item) {
+  return [item.name, item.group, item.note].join(" ").toLowerCase();
+}
+
+function restockSchedule(item) {
+  const interval = Number(item.intervalDays || 0);
+  if (!isDateId(item.lastBoughtDate) || !Number.isFinite(interval) || interval <= 0) {
+    return { group: "noSchedule", nextDate: "", daysUntil: null };
+  }
+  const nextDate = addDaysToDateId(item.lastBoughtDate, interval);
+  const daysUntil = daysBetweenDateIds(localDateId(), nextDate);
+  return { group: daysUntil <= 14 ? "dueSoon" : "later", nextDate, daysUntil };
+}
+
+function restockStatusText(schedule) {
+  if (schedule.group === "noSchedule") return t("noSchedule");
+  if (schedule.daysUntil < 0) return t("overdueDays", Math.abs(schedule.daysUntil));
+  if (schedule.daysUntil === 0) return t("dueToday");
+  if (schedule.daysUntil <= 14) return t("dueInDays", schedule.daysUntil);
+  return t("nextDate", formatShortDate(schedule.nextDate));
+}
+
+function restockStatusClass(schedule) {
+  if (schedule.group === "noSchedule") return "unscheduled";
+  if (schedule.daysUntil < 0) return "overdue";
+  if (schedule.daysUntil <= 14) return "due";
+  return "later";
+}
+
+function renderRestockItems() {
+  const query = els.recordSearchInput.value.trim().toLowerCase();
+  const items = (state.restockItems || [])
+    .filter(item => !query || restockSearchBlob(item).includes(query))
+    .map(item => ({ item, schedule: restockSchedule(item) }));
+  const groups = { dueSoon: [], later: [], noSchedule: [] };
+  items.forEach(entry => groups[entry.schedule.group].push(entry));
+  const byName = (a, b) => a.item.name.localeCompare(b.item.name);
+  const byNext = (a, b) => (a.schedule.nextDate || "9999-99-99").localeCompare(b.schedule.nextDate || "9999-99-99") || byName(a, b);
+  groups.dueSoon.sort(byNext);
+  groups.later.sort(byNext);
+  groups.noSchedule.sort(byName);
+  const html = [
+    renderRestockGroup("dueSoon", groups.dueSoon),
+    renderRestockGroup("laterRestock", groups.later),
+    renderRestockGroup("noSchedule", groups.noSchedule)
+  ].filter(Boolean).join("");
+  els.restockList.innerHTML = html || `<p class="restock-empty">${query ? t("noMatchingRestock") : t("noRestockItems")}</p>`;
+}
+
+function renderRestockGroup(labelKey, entries) {
+  if (!entries.length) return "";
+  return `
+    <section class="restock-group">
+      <div class="restock-group-title">
+        <h3>${t(labelKey)}</h3>
+        <span>${entries.length}</span>
+      </div>
+      ${entries.map(({ item, schedule }) => renderRestockCard(item, schedule)).join("")}
+    </section>
+  `;
+}
+
+function renderRestockCard(item, schedule) {
+  return `
+    <article class="restock-card" data-action="edit-restock" data-id="${item.id}" tabindex="0" aria-label="${escapeAttr(item.name)}">
+      <div class="restock-card-main">
+        <h3>${escapeHtml(item.name)}</h3>
+        ${item.group ? `<p class="restock-group-label">${escapeHtml(item.group)}</p>` : ""}
+        <p class="restock-meta">
+          <span>${t("lastBought")}: ${item.lastBoughtDate ? formatShortDate(item.lastBoughtDate) : t("notSet")}</span>
+          ${item.intervalDays ? `<span>${t("everyDays", item.intervalDays)}</span>` : ""}
+        </p>
+        ${item.note ? `<p class="restock-note">${escapeHtml(item.note)}</p>` : ""}
+      </div>
+      <div class="restock-card-side">
+        <span class="restock-status ${restockStatusClass(schedule)}">${escapeHtml(restockStatusText(schedule))}</span>
+        <button type="button" class="restock-mark-btn" data-action="mark-restock-bought" data-id="${item.id}">${t("markBought")}</button>
+      </div>
+    </article>
+  `;
+}
+
+function markRestockBought(id) {
+  const item = (state.restockItems || []).find(entry => entry.id === id);
+  if (!item) return;
+  item.lastBoughtDate = localDateId();
+  item.updatedAt = nowStamp();
+  markFinancialDirty();
+  saveState();
+  renderRecords();
+  showToast(t("savedToast"));
 }
 
 function renderRecordFilterGroup(label, items) {
@@ -3375,6 +3619,15 @@ document.body.addEventListener("click", event => {
     renderFunds();
   }
   if (action === "toggle-fund-pin") toggleFundPin(id);
+  if (action === "mark-restock-bought") {
+    event.stopPropagation();
+    markRestockBought(id);
+    return;
+  }
+  if (action === "edit-restock") {
+    openDialog("restock", id);
+    return;
+  }
   if (action === "edit-record") openDialog(button.dataset.kind, id);
   if (action === "edit-income") openDialog("income", id);
   if (action === "delete-income") removeItem("incomes", id);
@@ -3387,11 +3640,15 @@ document.body.addEventListener("click", event => {
 });
 
 document.body.addEventListener("keydown", event => {
-  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-transfer'], .clickable-row[data-action='edit-project-entry'], .clickable-row[data-action='edit-inline-allocation']");
+  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-transfer'], .clickable-row[data-action='edit-project-entry'], .clickable-row[data-action='edit-inline-allocation'], .restock-card[data-action='edit-restock']");
   if (!row || !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
   if (row.dataset.action === "edit-inline-allocation") {
     startAllocationRowEdit(row.dataset.fundId);
+    return;
+  }
+  if (row.dataset.action === "edit-restock") {
+    openDialog("restock", row.dataset.id);
     return;
   }
   if (row.dataset.action === "edit-project-entry" && selectedProject()?.status === "settled") return;
@@ -3576,10 +3833,12 @@ function unlockBackgroundScroll() {
 }
 
 function closeEntryDialog() {
+  hideNoteSuggestions();
   els.dialog.close();
 }
 
 function openDialog(mode, id = null, defaults = {}) {
+  hideNoteSuggestions();
   dialogMode = mode;
   editingId = id;
 
@@ -3594,7 +3853,8 @@ function openDialog(mode, id = null, defaults = {}) {
     quickAllocate: month.funds,
     transfer: month.funds,
     categoryRole: month.funds,
-    fixedBill: month.funds
+    fixedBill: month.funds,
+    restock: state.restockItems || []
   }[mode];
   const item = id ? source.find(entry => entry.id === id) : defaults;
 
@@ -3608,17 +3868,18 @@ function openDialog(mode, id = null, defaults = {}) {
     quickAllocate: t("allocateIncome"),
     transfer: id ? t("editMove") : t("moveFunds"),
     categoryRole: t("editCategorySettings"),
-    fixedBill: t("markFixedBillPaid")
+    fixedBill: t("markFixedBillPaid"),
+    restock: id ? t("editRestockItem") : t("addRestockItem")
   };
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
   const canDelete = (
-    ["expense", "project", "fund", "categoryRole"].includes(mode) &&
+    ["expense", "project", "fund", "categoryRole", "restock"].includes(mode) &&
     Boolean(id) &&
     !(mode === "project" && item?.status === "settled")
   ) || (mode === "transfer" && Boolean(id) && Boolean(findTransferPair(id)));
   els.deleteDialogBtn.hidden = !canDelete;
-  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["fund", "categoryRole", "transfer"].includes(mode) ? t("delete") : t("deleteExpense");
+  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["fund", "categoryRole", "transfer", "restock"].includes(mode) ? t("delete") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
   updateCategoryFixedFields();
   if (!els.dialog.open) {
@@ -3659,6 +3920,24 @@ function fieldTemplates(mode, item) {
   if (mode === "fund") {
     return `
       ${field(t("name"), "name", item.name || "", "text")}
+    `;
+  }
+
+  if (mode === "restock") {
+    return `
+      ${field(t("itemName"), "name", item.name || "", "text")}
+      <label class="field">${t("restockGroup")}
+        <input name="group" type="text" autocomplete="off" value="${escapeAttr(item.group || "")}">
+      </label>
+      <label class="field">${t("lastBoughtDate")}
+        <input name="lastBoughtDate" type="date" value="${escapeAttr(item.lastBoughtDate || localDateId())}">
+      </label>
+      <label class="field">${t("intervalDays")}
+        <input name="intervalDays" type="text" inputmode="numeric" autocomplete="off" value="${escapeAttr(item.intervalDays || "")}">
+      </label>
+      <label class="field">${t("restockNote")}
+        <input name="note" type="text" autocomplete="off" value="${escapeAttr(item.note || "")}">
+      </label>
     `;
   }
 
@@ -3948,6 +4227,7 @@ function noteField(label, value) {
 
 function updateNoteAutocomplete(event) {
   if (dialogMode !== "expense" || !event.target?.matches("[data-note-autocomplete]")) return;
+  clearNoteSuggestionsHideTimer();
 
   const panel = els.form.querySelector("[data-note-suggestions]");
   if (!panel) return;
@@ -3970,6 +4250,7 @@ function updateNoteAutocomplete(event) {
 function applyNoteSuggestion(event) {
   const button = event.target.closest("[data-note][data-category]");
   if (!button || dialogMode !== "expense") return;
+  clearNoteSuggestionsHideTimer();
 
   const noteInput = els.form.elements.note;
   const categorySelect = els.form.elements.category;
@@ -3980,7 +4261,37 @@ function applyNoteSuggestion(event) {
   hideNoteSuggestions();
 }
 
+function hideNoteSuggestionsOnOutsideClick(event) {
+  if (dialogMode !== "expense" || !isNoteSuggestionsVisible()) return;
+  if (event.target.closest(".note-autocomplete-field")) return;
+  hideNoteSuggestions();
+}
+
+function scheduleHideNoteSuggestions(event) {
+  if (dialogMode !== "expense" || !event.target?.matches("[data-note-autocomplete]")) return;
+
+  clearNoteSuggestionsHideTimer();
+  noteSuggestionsHideTimer = window.setTimeout(() => {
+    noteSuggestionsHideTimer = null;
+    const active = document.activeElement;
+    if (active && active.closest?.(".note-autocomplete-field")) return;
+    hideNoteSuggestions();
+  }, 120);
+}
+
+function clearNoteSuggestionsHideTimer() {
+  if (!noteSuggestionsHideTimer) return;
+  window.clearTimeout(noteSuggestionsHideTimer);
+  noteSuggestionsHideTimer = null;
+}
+
+function isNoteSuggestionsVisible() {
+  const panel = els.form.querySelector("[data-note-suggestions]");
+  return Boolean(panel && !panel.hidden);
+}
+
 function hideNoteSuggestions() {
+  clearNoteSuggestionsHideTimer();
   const panel = els.form.querySelector("[data-note-suggestions]");
   if (panel) {
     panel.hidden = true;
@@ -4087,6 +4398,11 @@ function saveEntry(event) {
     return;
   }
 
+  if (dialogMode === "restock") {
+    saveRestockItem(data);
+    return;
+  }
+
   if (dialogMode === "project") {
     saveProject(data);
     return;
@@ -4164,6 +4480,40 @@ function saveEntry(event) {
   markFinancialDirty();
   saveState();
   els.dialog.close();
+  render();
+}
+
+function saveRestockItem(data) {
+  if (!Array.isArray(state.restockItems)) state.restockItems = [];
+
+  const name = String(data.name || "").trim();
+  if (!name) {
+    alert(t("validRestockName"));
+    return;
+  }
+
+  const intervalText = String(data.intervalDays || "").trim();
+  const interval = intervalText ? Number(intervalText) : null;
+  if (intervalText && (!Number.isFinite(interval) || interval <= 0)) {
+    alert(t("validRestockInterval"));
+    return;
+  }
+
+  const date = String(data.lastBoughtDate || "").trim();
+  const existing = editingId ? state.restockItems.find(item => item.id === editingId) : null;
+  const item = existing || { id: crypto.randomUUID(), createdAt: nowStamp() };
+  item.name = name;
+  item.group = String(data.group || "").trim();
+  item.lastBoughtDate = isDateId(date) ? date : "";
+  item.intervalDays = interval ? Math.round(interval) : null;
+  item.note = String(data.note || "").trim();
+  item.updatedAt = nowStamp();
+
+  if (!existing) state.restockItems.push(item);
+
+  markFinancialDirty();
+  saveState();
+  closeEntryDialog();
   render();
 }
 
@@ -4342,7 +4692,24 @@ function deleteCurrentDialogItem() {
   }
   if (dialogMode === "fund" || dialogMode === "categoryRole") {
     deleteCurrentCategory();
+    return;
   }
+  if (dialogMode === "restock") {
+    deleteCurrentRestockItem();
+  }
+}
+
+function deleteCurrentRestockItem() {
+  if (!editingId) return;
+  const item = (state.restockItems || []).find(entry => entry.id === editingId);
+  if (!item) return;
+  if (!window.confirm(t("deleteRestockConfirm", item.name))) return;
+
+  state.restockItems = (state.restockItems || []).filter(entry => entry.id !== editingId);
+  markFinancialDirty();
+  saveState();
+  els.dialog.close();
+  render();
 }
 
 function deleteCurrentCategory() {
