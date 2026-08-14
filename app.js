@@ -271,6 +271,7 @@ const I18N = {
     editRecord: (category, amount) => `Edit ${category} record ${amount}`,
     addIncome: "Add Income",
     editIncome: "Edit Income",
+    deleteIncomeConfirm: "Delete this income? Income totals and unallocated amount will update immediately.",
     addFundDialog: "Add Category",
     editFundDialog: "Edit Category",
     addExpense: "Add Expense",
@@ -572,6 +573,7 @@ const I18N = {
     editRecord: (category, amount) => `编辑 ${category} 记录 ${amount}`,
     addIncome: "添加收入",
     editIncome: "编辑收入",
+    deleteIncomeConfirm: "删除这笔收入？总收入和未分配金额会立即更新。",
     addFundDialog: "添加分类",
     editFundDialog: "编辑分类",
     addExpense: "添加支出",
@@ -3630,7 +3632,7 @@ document.body.addEventListener("click", event => {
   }
   if (action === "edit-record") openDialog(button.dataset.kind, id);
   if (action === "edit-income") openDialog("income", id);
-  if (action === "delete-income") removeItem("incomes", id);
+  if (action === "delete-income") deleteIncomeById(id);
   if (action === "edit-fund") openDialog("fund", id);
   if (action === "delete-fund") removeItem("funds", id);
   if (action === "edit-expense") openDialog("expense", id);
@@ -3874,12 +3876,12 @@ function openDialog(mode, id = null, defaults = {}) {
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
   const canDelete = (
-    ["expense", "project", "fund", "categoryRole", "restock"].includes(mode) &&
+    ["income", "expense", "project", "fund", "categoryRole", "restock"].includes(mode) &&
     Boolean(id) &&
     !(mode === "project" && item?.status === "settled")
   ) || (mode === "transfer" && Boolean(id) && Boolean(findTransferPair(id)));
   els.deleteDialogBtn.hidden = !canDelete;
-  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["fund", "categoryRole", "transfer", "restock"].includes(mode) ? t("delete") : t("deleteExpense");
+  els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["income", "fund", "categoryRole", "transfer", "restock"].includes(mode) ? t("delete") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
   updateCategoryFixedFields();
   if (!els.dialog.open) {
@@ -4678,6 +4680,10 @@ function renameCategoryRecords(previousName, nextName) {
 }
 
 function deleteCurrentDialogItem() {
+  if (dialogMode === "income") {
+    deleteCurrentIncome();
+    return;
+  }
   if (dialogMode === "expense") {
     deleteCurrentExpense();
     return;
@@ -4697,6 +4703,28 @@ function deleteCurrentDialogItem() {
   if (dialogMode === "restock") {
     deleteCurrentRestockItem();
   }
+}
+
+function deleteCurrentIncome() {
+  if (dialogMode !== "income" || !editingId) return;
+  deleteIncomeById(editingId, { closeDialog: true });
+}
+
+function deleteIncomeById(id, options = {}) {
+  const month = currentMonth();
+  const income = month.incomes.find(item => item.id === id);
+  if (!income) return;
+  if (!window.confirm(t("deleteIncomeConfirm"))) return;
+
+  month.incomes = month.incomes.filter(item => item.id !== id);
+  markFinancialDirty();
+  saveState();
+  if (options.closeDialog) {
+    els.dialog.close();
+    dialogMode = null;
+    editingId = null;
+  }
+  render();
 }
 
 function deleteCurrentRestockItem() {
