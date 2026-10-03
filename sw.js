@@ -1,10 +1,13 @@
-const CACHE_NAME = "money-pwa-v130";
+const CACHE_NAME = "money-pwa-v131";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=restock-records-1",
+  "./styles.css?v=sync-v2-1",
   "./sync-config.js?v=category-metadata-1",
-  "./app.js?v=restock-records-1",
+  "./app.js?v=sync-v2-1",
+  "./sync-core.js?v=sync-v2-1",
+  "./sync-runtime.js?v=sync-v2-1",
+  "./vendor/supabase.js",
   "./manifest.webmanifest",
   "./icon.svg"
 ];

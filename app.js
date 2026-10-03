@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.07.17.1";
+const APP_VERSION = "2026.10.03.1";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -162,7 +162,7 @@ const I18N = {
     lastBackup: "Last backup",
     neverBackedUp: "Never backed up",
     cloudSync: "Cloud Sync",
-    cloudSyncText: "Sync this device with Supabase.",
+    cloudSyncText: "Automatically sync your ledger across devices. Conflicting changes are kept for review.",
     cloudSyncNotConfigured: "Add your Supabase URL and anon key in sync-config.js.",
     cloudSyncSignedOut: "Sign in with your existing account password to sync across devices.",
     cloudSyncSignedIn: email => `Signed in as ${email}`,
@@ -175,11 +175,21 @@ const I18N = {
     cloudSyncError: "Cloud sync failed.",
     signIn: "Sign in",
     signOut: "Sign out",
-    syncDownloadCloud: "Download cloud",
-    syncUploadDevice: "Upload this device",
+    syncDownloadCloud: "Use cloud ledger",
+    syncUploadDevice: "Use this ledger",
+    syncNow: "Sync now",
+    syncRecoveryBackup: "Export recovery backup",
+    syncComplete: time => `Synced · ${time}`,
+    syncPending: "Changes saved on this device. Waiting to sync.",
+    syncOffline: "Offline. Changes stay on this device and sync when you reconnect.",
+    syncConflict: "Both copies have changed. Automatic sync is paused. Back up both copies before choosing a ledger.",
+    syncLinkRequired: "Choose the ledger to start syncing. Existing copies will be backed up before replacement.",
+    syncSetupRequired: "Cloud sync needs a server update. Your local ledger is safe. Retry after setup is complete.",
+    syncAccountChanged: "Another tab changed the active account. Sign in again to continue with this ledger.",
+    syncUnavailable: "Cloud sync could not start. Your local ledger is still available.",
     cloudSyncNoCloudData: "No cloud data yet.",
-    cloudSyncDownloadConfirm: "This will replace this device with cloud data. Continue?",
-    cloudSyncUploadConfirm: "This will replace cloud data with this device. Continue?",
+    cloudSyncDownloadConfirm: "Use the cloud ledger and replace this device's ledger? A recovery copy of this device's ledger will be saved first.",
+    cloudSyncUploadConfirm: "Use this device's ledger and replace the cloud ledger? Recovery copies will be saved first. Other devices' conflicting changes will not be merged.",
     cloudSyncUploadVerifyFailed: "Upload did not replace cloud data. Please try again.",
     syncDiagLocalUpdated: "Local updated",
     syncDiagCloudRowUpdated: "Cloud row updated",
@@ -464,7 +474,7 @@ const I18N = {
     lastBackup: "最近备份",
     neverBackedUp: "还没有备份",
     cloudSync: "云同步",
-    cloudSyncText: "通过 Supabase 同步这台设备。",
+    cloudSyncText: "自动同步电脑与手机的账本。冲突修改会保留，等待你处理。",
     cloudSyncNotConfigured: "请先在 sync-config.js 填入 Supabase URL 和 anon key。",
     cloudSyncSignedOut: "使用现有账号密码登录后即可跨设备同步。",
     cloudSyncSignedIn: email => `已登录：${email}`,
@@ -477,11 +487,21 @@ const I18N = {
     cloudSyncError: "云同步失败。",
     signIn: "登录",
     signOut: "退出登录",
-    syncDownloadCloud: "下载云端",
-    syncUploadDevice: "上传本机",
+    syncDownloadCloud: "采用云端账本",
+    syncUploadDevice: "采用本机账本",
+    syncNow: "立即同步",
+    syncRecoveryBackup: "导出恢复备份",
+    syncComplete: time => `已同步 · ${time}`,
+    syncPending: "修改已保存在本机，等待同步。",
+    syncOffline: "当前离线。修改保存在本机，联网后自动同步。",
+    syncConflict: "两份账本都有修改，自动同步已暂停。请先备份两份账本，再选择采用哪一份。",
+    syncLinkRequired: "请选择用于开始同步的账本。替换前会保存恢复备份。",
+    syncSetupRequired: "云同步需要更新服务器。本机账本安全保留，设置完成后可重试。",
+    syncAccountChanged: "另一标签页切换了账号，请重新登录以继续使用这份账本。",
+    syncUnavailable: "暂时无法启动云同步，你仍可使用本机账本。",
     cloudSyncNoCloudData: "云端还没有数据。",
-    cloudSyncDownloadConfirm: "这会用云端数据替换这台设备。是否继续？",
-    cloudSyncUploadConfirm: "这会用这台设备替换云端数据。是否继续？",
+    cloudSyncDownloadConfirm: "采用云端账本并替换本机账本？替换前会保存本机账本的恢复备份。",
+    cloudSyncUploadConfirm: "采用本机账本并替换云端账本？替换前会保存恢复备份，其他设备的冲突修改不会自动合并。",
     cloudSyncUploadVerifyFailed: "上传没有成功替换云端数据，请再试一次。",
     syncDiagLocalUpdated: "本机更新",
     syncDiagCloudRowUpdated: "云端行更新",
@@ -811,6 +831,7 @@ const initialData = {
   }
 };
 
+let syncPristine = !localStorage.getItem(STORAGE_KEY);
 let state = loadState();
 let dialogMode = null;
 let editingId = null;
@@ -845,6 +866,16 @@ let applyingRemoteState = false;
 let syncInitialized = false;
 let passwordRecoveryMode = false;
 let lastFetchedRemoteSync = null;
+let syncUserId = null;
+let syncGeneration = 0;
+let syncBaseline = null;
+let syncPhase = "signed-out";
+let syncTimer = null;
+let syncPollTimer = null;
+let syncQueued = false;
+let syncLastSaved = MoneySync.content(state);
+const SYNC_OWNER_KEY = "money-sync-owner-v2";
+const SYNC_PREFIX = "money-sync-v2:";
 
 const els = {
   monthSelect: document.querySelector("#monthSelect"),
@@ -960,6 +991,8 @@ const els = {
   syncDownloadBtn: document.querySelector("#syncDownloadBtn"),
   syncUploadBtn: document.querySelector("#syncUploadBtn"),
   syncSignOutBtn: document.querySelector("#syncSignOutBtn"),
+  syncNowBtn: document.querySelector("#syncNowBtn"),
+  syncBackupBtn: document.querySelector("#syncBackupBtn"),
   backupStatusTitle: document.querySelector("#backupStatusTitle"),
   backupStatusText: document.querySelector("#backupStatusText"),
   backupStatusValue: document.querySelector("#backupStatusValue"),
@@ -1146,6 +1179,8 @@ els.syncUpdatePasswordBtn.addEventListener("click", updateCloudSyncPassword);
 els.syncDownloadBtn.addEventListener("click", () => downloadCloudSyncState({ manual: true }));
 els.syncUploadBtn.addEventListener("click", () => uploadDeviceSyncState({ manual: true }));
 els.syncSignOutBtn.addEventListener("click", signOutOfCloudSync);
+els.syncNowBtn.addEventListener("click", () => runCloudSync({ manual: true }));
+els.syncBackupBtn.addEventListener("click", exportSyncRecovery);
 els.backupNowBtn.addEventListener("click", exportData);
 els.dismissBackupBtn.addEventListener("click", dismissBackupReminder);
 document.querySelector("#cancelDialogBtn").addEventListener("click", closeEntryDialog);
@@ -1435,7 +1470,28 @@ function saveState(options = {}) {
   if (touch && !applyingRemoteState) {
     state.updatedAt = new Date().toISOString();
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // Another tab may have saved while this tab's form was open. Merge only
+  // independent changes; keep recoverable copies and stop on a conflict.
+  const stored = localStorage.getItem(STORAGE_KEY);
+  const storedOwner = localStorage.getItem(SYNC_OWNER_KEY);
+  if (options.sync !== false && stored && storedOwner === syncUserId) {
+    const previous = JSON.parse(stored);
+    const other = MoneySync.content(previous);
+    const own = MoneySync.content(state);
+    if (!MoneySync.equal(other, syncLastSaved) && !MoneySync.equal(own, other)) {
+      const result = MoneySync.merge(syncLastSaved, own, other);
+      if (result.conflicts.length) {
+        saveSyncRecovery(state, "local-tab");
+        saveSyncRecovery(previous, "other-tab");
+        markSyncConflict();
+      } else state = MoneySync.withContent(state, result.value);
+    }
+  }
+  persistSyncLedger();
+  if (options.sync !== false) {
+    syncPristine = false;
+    scheduleCloudSync();
+  }
 }
 
 function markFinancialDirty() {
@@ -5641,396 +5697,6 @@ function importData(event) {
     }
   };
   reader.readAsText(file);
-}
-
-function syncConfig() {
-  const config = window.MONEY_SYNC_CONFIG || {};
-  return {
-    supabaseUrl: String(config.supabaseUrl || "").trim(),
-    supabaseAnonKey: String(config.supabaseAnonKey || "").trim()
-  };
-}
-
-function isCloudSyncConfigured() {
-  const config = syncConfig();
-  return Boolean(config.supabaseUrl && config.supabaseAnonKey);
-}
-
-function getDeviceId() {
-  const key = "monthly-money-manager-device-id";
-  let deviceId = localStorage.getItem(key);
-  if (!deviceId) {
-    deviceId = crypto.randomUUID();
-    localStorage.setItem(key, deviceId);
-  }
-  return deviceId;
-}
-
-function renderCloudSyncStatus(message = "") {
-  if (!els.cloudSyncStatus) return;
-  const configured = isCloudSyncConfigured();
-  const signedIn = Boolean(syncSession);
-  els.syncEmailInput.hidden = !configured || signedIn || passwordRecoveryMode;
-  els.syncCodeInput.hidden = !configured || signedIn || passwordRecoveryMode;
-  els.syncNewPasswordInput.hidden = !configured || !passwordRecoveryMode;
-  els.syncDownloadBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
-  els.syncUploadBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
-  els.syncSignOutBtn.hidden = !configured || !signedIn || passwordRecoveryMode;
-  els.syncSignInBtn.hidden = !configured || signedIn || passwordRecoveryMode;
-  els.syncUpdatePasswordBtn.hidden = !configured || !passwordRecoveryMode;
-  els.syncSignInBtn.textContent = t("signIn");
-  els.syncUpdatePasswordBtn.textContent = t("savePassword");
-  els.syncDownloadBtn.textContent = t("syncDownloadCloud");
-  els.syncUploadBtn.textContent = t("syncUploadDevice");
-  els.syncSignOutBtn.textContent = t("signOut");
-
-  if (!configured) {
-    els.cloudSyncStatus.textContent = t("cloudSyncNotConfigured");
-    renderCloudSyncDiagnostics(null);
-    return;
-  }
-  if (message) {
-    els.cloudSyncStatus.textContent = message;
-    renderCloudSyncDiagnostics(lastFetchedRemoteSync);
-    return;
-  }
-  if (passwordRecoveryMode) {
-    els.cloudSyncStatus.textContent = t("cloudSyncPasswordRecovery");
-    renderCloudSyncDiagnostics(lastFetchedRemoteSync);
-    return;
-  }
-  if (!syncSession) {
-    els.cloudSyncStatus.textContent = t("cloudSyncSignedOut");
-    renderCloudSyncDiagnostics(null);
-    return;
-  }
-  const lastSynced = state.cloudSync?.lastSyncedAt;
-  els.cloudSyncStatus.textContent = lastSynced
-    ? t("cloudSyncLastSynced", formatShortDate(lastSynced.slice(0, 10)))
-    : t("cloudSyncSignedIn", syncSession.user?.email || "");
-  renderCloudSyncDiagnostics(lastFetchedRemoteSync);
-}
-
-function syncDiagnosticValue(value) {
-  return value || "—";
-}
-
-function renderCloudSyncDiagnostics(remote = lastFetchedRemoteSync) {
-  if (!els.cloudSyncDiagnostics) return;
-  if (!isCloudSyncConfigured() || !syncSession || passwordRecoveryMode) {
-    els.cloudSyncDiagnostics.textContent = "";
-    return;
-  }
-  const cloudSync = state.cloudSync || {};
-  const lines = [
-    `${t("syncDiagLocalUpdated")}: ${syncDiagnosticValue(state.updatedAt)}`,
-    `${t("syncDiagCloudRowUpdated")}: ${syncDiagnosticValue(remote?.updated_at)}`,
-    `${t("syncDiagCloudDataUpdated")}: ${syncDiagnosticValue(remote?.data_json?.updatedAt)}`,
-    `${t("syncDiagCloudDevice")}: ${syncDiagnosticValue(remote?.device_id)}`,
-    `${t("syncDiagCloudVersion")}: ${syncDiagnosticValue(remote?.app_version)}`,
-    `${t("syncDiagLastAction")}: ${syncDiagnosticValue(cloudSync.lastAction || cloudSync.lastSyncedAt)}`
-  ];
-  els.cloudSyncDiagnostics.textContent = lines.join("\n");
-}
-
-function cloudSyncErrorMessage(error) {
-  const detail = error?.message || error?.error_description || "";
-  return detail ? `${t("cloudSyncError")} ${detail}` : t("cloudSyncError");
-}
-
-function isPasswordRecoveryUrl() {
-  const source = `${window.location.search || ""}${window.location.hash || ""}`;
-  return source.includes("type=recovery");
-}
-
-function clearAuthUrlState() {
-  if (!window.location.hash && !window.location.search.includes("type=recovery")) return;
-  const url = new URL(window.location.href);
-  ["access_token", "refresh_token", "expires_at", "expires_in", "provider_token", "token_type", "type", "code", "error", "error_code", "error_description"].forEach(key => {
-    url.searchParams.delete(key);
-  });
-  url.hash = "";
-  window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
-}
-
-async function initCloudSync() {
-  if (!isCloudSyncConfigured() || !window.supabase?.createClient) {
-    syncInitialized = true;
-    renderCloudSyncStatus();
-    return;
-  }
-
-  const config = syncConfig();
-  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
-    global: {
-      fetch: (input, init = {}) => fetch(input, { ...init, cache: "no-store" })
-    },
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  });
-
-  passwordRecoveryMode = isPasswordRecoveryUrl();
-  const { data } = await supabaseClient.auth.getSession();
-  syncSession = data?.session || null;
-  syncInitialized = true;
-  renderCloudSyncStatus();
-
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    syncSession = session || null;
-    if (event === "PASSWORD_RECOVERY") {
-      passwordRecoveryMode = true;
-      els.syncNewPasswordInput.value = "";
-      renderCloudSyncStatus(t("cloudSyncPasswordRecovery"));
-      window.setTimeout(() => els.syncNewPasswordInput.focus(), 0);
-      return;
-    }
-    renderCloudSyncStatus();
-  });
-}
-
-async function signInToCloudSync() {
-  if (!isCloudSyncConfigured()) {
-    showToast(t("cloudSyncNotConfigured"));
-    renderCloudSyncStatus();
-    return;
-  }
-  if (!supabaseClient) {
-    await initCloudSync();
-  }
-  if (syncSession) {
-    renderCloudSyncStatus();
-    return;
-  }
-  const email = els.syncEmailInput.value.trim();
-  if (!email) {
-    els.syncEmailInput.focus();
-    return;
-  }
-  const password = els.syncCodeInput.value;
-  if (!password) {
-    els.syncCodeInput.focus();
-    return;
-  }
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) {
-    const message = cloudSyncErrorMessage(error);
-    showToast(message);
-    renderCloudSyncStatus(message);
-    return;
-  }
-  syncSession = data?.session || null;
-  els.syncCodeInput.value = "";
-  renderCloudSyncStatus();
-}
-
-async function updateCloudSyncPassword() {
-  if (!isCloudSyncConfigured()) {
-    showToast(t("cloudSyncNotConfigured"));
-    renderCloudSyncStatus();
-    return;
-  }
-  if (!supabaseClient) {
-    await initCloudSync();
-  }
-  const password = els.syncNewPasswordInput.value;
-  if (!password) {
-    els.syncNewPasswordInput.focus();
-    return;
-  }
-  const { data, error } = await supabaseClient.auth.updateUser({ password });
-  if (error) {
-    const message = cloudSyncErrorMessage(error);
-    showToast(message);
-    renderCloudSyncStatus(message);
-    els.syncNewPasswordInput.focus();
-    return;
-  }
-  syncSession = data?.session || syncSession;
-  passwordRecoveryMode = false;
-  els.syncNewPasswordInput.value = "";
-  clearAuthUrlState();
-  showToast(t("cloudSyncPasswordUpdated"));
-  renderCloudSyncStatus(t("cloudSyncPasswordUpdated"));
-}
-
-async function signOutOfCloudSync() {
-  if (!supabaseClient) return;
-  await supabaseClient.auth.signOut();
-  syncSession = null;
-  passwordRecoveryMode = false;
-  renderCloudSyncStatus();
-}
-
-async function fetchRemoteSyncState() {
-  if (!supabaseClient || !syncSession) return null;
-  const { data, error } = await supabaseClient
-    .from(SYNC_TABLE)
-    .select("data_json, updated_at, device_id, app_version")
-    .eq("user_id", syncSession.user.id)
-    .maybeSingle();
-  if (error) throw error;
-  lastFetchedRemoteSync = data || null;
-  return lastFetchedRemoteSync;
-}
-
-function setCloudSyncMarkers(remote, action = "", syncedAt = new Date().toISOString()) {
-  state.cloudSync = {
-    lastSyncedAt: syncedAt,
-    lastRemoteUpdatedAt: remote?.updated_at || null,
-    lastAction: action || state.cloudSync?.lastAction || null
-  };
-}
-
-async function ensureCloudSyncReady(manual = false) {
-  if (!isCloudSyncConfigured()) {
-    if (manual) showToast(t("cloudSyncNotConfigured"));
-    renderCloudSyncStatus();
-    return false;
-  }
-  if (!supabaseClient) await initCloudSync();
-  if (!syncSession) {
-    if (manual) showToast(t("cloudSyncSignedOut"));
-    renderCloudSyncStatus();
-    return false;
-  }
-  return true;
-}
-
-async function uploadLocalSyncState() {
-  if (!supabaseClient || !syncSession) return;
-  const remoteUpdatedAt = new Date().toISOString();
-  const deviceId = getDeviceId();
-  const payload = structuredClone(state);
-  payload.cloudSync = {
-    ...(payload.cloudSync || {}),
-    lastAction: "upload"
-  };
-  const { data, error } = await supabaseClient
-    .from(SYNC_TABLE)
-    .upsert({
-      user_id: syncSession.user.id,
-      data_json: payload,
-      updated_at: remoteUpdatedAt,
-      device_id: deviceId,
-      app_version: APP_VERSION
-    }, { onConflict: "user_id" })
-    .select("data_json, updated_at, device_id, app_version")
-    .single();
-  if (error) throw error;
-  const remoteRow = data || {
-    data_json: payload,
-    updated_at: remoteUpdatedAt,
-    device_id: deviceId,
-    app_version: APP_VERSION
-  };
-  lastFetchedRemoteSync = remoteRow;
-  setCloudSyncMarkers(remoteRow, "upload", remoteUpdatedAt);
-  saveState({ touch: false, sync: false });
-  renderCloudSyncStatus();
-  return {
-    row: remoteRow,
-    updatedAt: payload.updatedAt,
-    remoteUpdatedAt,
-    deviceId
-  };
-}
-
-async function verifyCloudUpload(expected) {
-  const remote = await fetchRemoteSyncState();
-  const expectedUpdatedAt = typeof expected === "string" ? expected : expected?.updatedAt;
-  const expectedRemoteUpdatedAt = typeof expected === "string" ? "" : expected?.remoteUpdatedAt;
-  const expectedDeviceId = typeof expected === "string" ? getDeviceId() : expected?.deviceId;
-  const matchesData = remote?.data_json?.updatedAt === expectedUpdatedAt;
-  const matchesDevice = remote?.device_id === expectedDeviceId;
-  const matchesVersion = remote?.app_version === APP_VERSION;
-  const matchesRemoteTime = syncTimeMatches(remote?.updated_at, expectedRemoteUpdatedAt);
-  if (!remote?.data_json || !matchesData || !matchesDevice || !matchesVersion || !matchesRemoteTime) {
-    throw new Error("Cloud upload verification failed");
-  }
-  setCloudSyncMarkers(remote, "upload");
-  saveState({ touch: false, sync: false });
-  return remote;
-}
-
-function syncTimeMatches(actual, expected) {
-  if (!expected) return true;
-  if (actual === expected) return true;
-  const actualTime = Date.parse(actual || "");
-  const expectedTime = Date.parse(expected || "");
-  return Boolean(actualTime && expectedTime && Math.abs(actualTime - expectedTime) < 2000);
-}
-
-async function downloadCloudSyncState({ manual = false } = {}) {
-  if (!await ensureCloudSyncReady(manual)) return;
-  if (syncInFlight) return;
-  if (manual) {
-    showToast(t("cloudSyncChecking"));
-    renderCloudSyncStatus(t("cloudSyncChecking"));
-  }
-  try {
-    const remote = await fetchRemoteSyncState();
-    if (!remote) {
-      if (manual) showToast(t("cloudSyncNoCloudData"));
-      renderCloudSyncStatus();
-      return;
-    }
-    if (!window.confirm(t("cloudSyncDownloadConfirm"))) {
-      renderCloudSyncStatus();
-      return;
-    }
-    applyRemoteSyncState(remote);
-    showToast(t("cloudSyncDownloaded"));
-  } catch (error) {
-    console.warn("Cloud download failed", error);
-    const verifyFailed = error?.message === "Cloud upload verification failed";
-    if (manual) showToast(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
-    renderCloudSyncStatus(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
-  }
-}
-
-async function uploadDeviceSyncState({ manual = false } = {}) {
-  if (!await ensureCloudSyncReady(manual)) return;
-  if (syncInFlight) return;
-  if (manual) {
-    showToast(t("cloudSyncChecking"));
-    renderCloudSyncStatus(t("cloudSyncChecking"));
-  }
-  syncInFlight = true;
-  try {
-    const remote = await fetchRemoteSyncState();
-    if (remote && !window.confirm(t("cloudSyncUploadConfirm"))) {
-      renderCloudSyncStatus();
-      return;
-    }
-    state.updatedAt = nowStamp();
-    saveState({ touch: false, sync: false });
-    const uploadResult = await uploadLocalSyncState();
-    await verifyCloudUpload(uploadResult);
-    if (manual) showToast(t("cloudSyncUploaded"));
-  } catch (error) {
-    console.warn("Cloud upload failed", error);
-    const verifyFailed = error?.message === "Cloud upload verification failed";
-    if (manual) showToast(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
-    renderCloudSyncStatus(verifyFailed ? t("cloudSyncUploadVerifyFailed") : t("cloudSyncError"));
-  } finally {
-    syncInFlight = false;
-  }
-}
-
-function applyRemoteSyncState(remote) {
-  if (!remote?.data_json) return;
-  applyingRemoteState = true;
-  try {
-    state = normalizeStateLanguage(structuredClone(remote.data_json));
-    setCloudSyncMarkers(remote, "download");
-    saveState({ touch: false, sync: false });
-  } finally {
-    applyingRemoteState = false;
-  }
-  render();
 }
 
 async function checkForUpdates() {

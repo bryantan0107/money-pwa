@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=restock-records-1">
+    <link rel="stylesheet" href="styles.css?v=sync-v2-1">
   </head>
   <body>
     <div class="app-shell">
@@ -191,7 +191,7 @@
               <article class="settings-item sync-settings-item">
                 <div>
                   <strong id="cloudSyncTitle">Cloud Sync</strong>
-                  <p id="cloudSyncText">Sync this device with Supabase.</p>
+                  <p id="cloudSyncText">Automatically sync your ledger across devices.</p>
                   <small id="cloudSyncStatus">Not configured</small>
                   <small id="cloudSyncDiagnostics" class="sync-diagnostics"></small>
                 </div>
@@ -204,6 +204,8 @@
                   <button id="syncDownloadBtn" type="button">Download cloud</button>
                   <button id="syncUploadBtn" type="button">Upload this device</button>
                   <button id="syncSignOutBtn" type="button" hidden>Sign out</button>
+                  <button id="syncNowBtn" type="button" hidden>Sync now</button>
+                  <button id="syncBackupBtn" type="button" hidden>Export recovery backup</button>
                 </div>
               </article>
               <article class="settings-item passive">
@@ -479,8 +481,10 @@
       </form>
     </dialog>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="vendor/supabase.js"></script>
+    <script src="sync-core.js?v=sync-v2-1"></script>
+    <script src="sync-runtime.js?v=sync-v2-1"></script>
     <script src="sync-config.js?v=category-metadata-1"></script>
-    <script src="app.js?v=restock-records-1"></script>
+    <script src="app.js?v=sync-v2-1"></script>
   </body>
 </html>

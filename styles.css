@@ -2091,6 +2091,20 @@ label.field.compact {
   margin-top: 10px;
   white-space: pre-line;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .sync-settings-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .sync-settings-item .settings-actions {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .settings-actions {
