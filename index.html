@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=settings-layout-1">
+    <link rel="stylesheet" href="styles.css?v=itinerary-1">
   </head>
   <body>
     <div class="app-shell">
@@ -430,29 +430,22 @@
           </section>
 
           <section id="projectPlanPanel" class="panel project-plan-panel" data-project-panel="plan" hidden>
-            <div class="panel-title">
-              <h2>Plan</h2>
-              <div class="inline-actions project-plan-title-actions">
-                <div id="projectPlanModeToggle" class="project-plan-mode compact segmented-control" role="tablist" aria-label="Plan mode">
-                  <button type="button" data-project-plan-mode="notes" class="active" aria-pressed="true">Notes</button>
-                  <button type="button" data-project-plan-mode="daily" aria-pressed="false">Daily</button>
-                </div>
-                <button id="projectPlanEditBtn" class="secondary-action" type="button">Edit</button>
-              </div>
+            <div class="panel-title"><h2>Itinerary</h2></div>
+            <details id="projectPlanNotesPanel" class="itinerary-notes">
+              <summary><strong id="tripNotesTitle">Trip notes</strong><span id="tripNotesHint">Hotels, transport and things to remember</span></summary>
+              <div id="projectPlanDisplay" class="itinerary-notes-content"></div>
+            </details>
+            <div class="itinerary-section-head"><h3 id="dailyItineraryTitle">Daily itinerary</h3><p id="itineraryEditHint" class="itinerary-empty"></p></div>
+            <div id="itineraryNavigation" class="itinerary-navigation">
+              <label><span id="itineraryJumpLabel">Jump to a date</span><select id="itineraryDateJump"></select></label>
+              <button id="itineraryTodayBtn" class="secondary-action" type="button" hidden>Today</button>
             </div>
-            <div id="projectPlanNotesPanel">
-              <div id="projectPlanDisplay" class="project-plan-display"></div>
-              <div id="projectPlanEditor" class="project-plan-editor" hidden>
-                <textarea id="projectPlanTextarea" rows="12" placeholder="Write notes, itinerary, or plans"></textarea>
-              </div>
-            </div>
-            <div id="projectPlanDailyPanel" class="project-plan-daily" hidden>
-              <div id="projectDailyPlanList" class="project-day-list"></div>
-            </div>
-            <div id="projectPlanActions" class="project-plan-actions" hidden>
-              <button id="projectPlanCancelBtn" class="secondary-action" type="button">Cancel</button>
-              <button id="projectPlanSaveBtn" class="primary-action" type="button">Save</button>
-            </div>
+            <div id="projectDailyPlanList" class="itinerary-days"></div>
+            <details id="itineraryOtherDates" class="itinerary-other-dates" hidden>
+              <summary id="itineraryOtherTitle">Other dates</summary>
+              <p id="itineraryOtherHelp"></p>
+              <div id="itineraryOtherList" class="itinerary-days"></div>
+            </details>
           </section>
         </section>
 
@@ -494,8 +487,9 @@
     <script src="sync-core.js?v=project-ledger-1"></script>
     <script src="projects-core.js?v=project-ledger-1"></script>
     <script src="project-ui.js?v=project-ledger-1"></script>
+    <script src="itinerary.js?v=itinerary-1"></script>
     <script src="sync-runtime.js?v=project-ledger-1"></script>
     <script src="sync-config.js?v=category-metadata-1"></script>
-    <script src="app.js?v=settings-layout-1"></script>
+    <script src="app.js?v=itinerary-1"></script>
   </body>
 </html>

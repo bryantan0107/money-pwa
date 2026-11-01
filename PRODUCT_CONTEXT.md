@@ -68,6 +68,8 @@ This file records long-term product direction and user preferences for this proj
 - Old settled Projects retain their original aggregate settlement expenses and read-only original entry details. Never recreate or split historical payments automatically.
 - Old active Project entries need one-time explicit review: post with payment date/category, link an existing expense, or skip. Store each resolution durably; prevent completion/deletion until all old entries are reviewed. New Projects have no such prompt.
 - Preserve Project notes and daily plans. Do not introduce forecast budgets or a paid/unpaid workflow for new project entries.
+- Project plans are a travel itinerary: one page with collapsible trip notes and daily reading cards, optional date jump / Today, clickable HTTP(S) links, and one-day-at-a-time editing with explicit save/cancel. Keep free text rather than requiring structured activity fields.
+- Reuse `planText` and `dailyPlans` without automatic content migration. Saved plans outside the displayed trip dates must remain visible under Other dates and editable.
 - Detail pages should feel like separate mobile app screens.
 - Homepage-only summary elements should not follow into detail pages.
 - `Balance Detail` pages should not show the top income summary strip.

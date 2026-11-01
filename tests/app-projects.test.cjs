@@ -18,7 +18,7 @@ function app(data=fixture()) {
   const storage = new Map([['monthly-money-manager-v2',JSON.stringify(data)]]), nodes = new Map();
   function node(selector) {
     if (!nodes.has(selector)) nodes.set(selector,{innerHTML:'',value:'',hidden:false,dataset:{},style:{},
-      addEventListener(){},querySelector:s=>node(selector+' '+s),querySelectorAll:()=>[],
+      listeners:{},addEventListener(type,handler){this.listeners[type]=handler;},querySelector:s=>node(selector+' '+s),querySelectorAll:()=>[],
       classList:{contains:()=>false,add(){},remove(){},toggle(){}},setAttribute(){},focus(){},close(){this.open=false;},showModal(){this.open=true;}});
     return nodes.get(selector);
   }
@@ -32,13 +32,13 @@ function app(data=fixture()) {
     window:{location:{hostname:'127.0.0.1'},addEventListener(){},scrollTo(){},clearTimeout(){},setTimeout(){},confirm:message=>{confirms.push(message);return context.answer!==false;}},
     FileReader:class {readAsText(file){this.result=file.text;this.onload();}}
   });
-  for(const name of ['project-ui.js','sync-runtime.js','app.js']) {
+  for(const name of ['project-ui.js','itinerary.js','sync-runtime.js','app.js']) {
     let source=fs.readFileSync(path.join(root,name),'utf8');
     if(name==='app.js') source=source.replace(/\nrender\(\);\nregisterServiceWorker\(\);\ninitCloudSync\(\);\s*$/,'');
     vm.runInContext(source,context,{filename:name});
   }
   const run=source=>vm.runInContext(source,context);
-  run('render=()=>{}; showToast=()=>{}; closeEntryDialog=()=>{}; scheduleCloudSync=()=>{};');
+  run('render=()=>{}; showToast=()=>{}; closeEntryDialog=()=>{els.dialog.close();}; scheduleCloudSync=()=>{};');
   const state=()=>JSON.parse(run('JSON.stringify(state)'));
   return {run,state,alerts,confirms,context,storage};
 }
@@ -46,6 +46,33 @@ const finance = data => Object.fromEntries(Object.entries(data.months).map(([key
   funds:m.funds.map(({updatedAt,...f})=>f),incomes:m.incomes,
   expenses:m.expenses.map(({projectId,updatedAt,...e})=>e)
 }]));
+test('itinerary rendering and explicit edits preserve ledger money and unrelated plan text',()=>{
+  const a=app();a.run(`saveProject({name:'Trip',defaultFundId:'june',startDate:'2026-06-02',endDate:'2026-06-03'});
+    selectedProject().planText='Hotel address';selectedProject().dailyPlans=[{date:'2026-06-01',note:'Arrival'},{date:'2026-06-02',note:'Walk'}];`);
+  const before=a.state();a.run('renderProjectPlan(selectedProject())');assert.deepEqual(a.state(),before);
+  a.context.itineraryDraft='Museum\nhttps://example.test/map';
+  a.run(`openItineraryEditor('2026-06-02');saveItineraryDialog({itineraryText:itineraryDraft});`);
+  const p=a.state().projects[0];assert.equal(p.planText,'Hotel address');assert.equal(p.dailyPlans[0].note,'Arrival');
+  assert.equal(p.dailyPlans[1].note,'Museum\nhttps://example.test/map');assert.deepEqual(a.state().months,before.months);
+  a.run(`openItineraryEditor();saveItineraryDialog({itineraryText:'Updated hotel address'});`);
+  assert.equal(a.state().projects[0].planText,'Updated hotel address');assert.deepEqual(a.state().projects[0].dailyPlans,p.dailyPlans);
+  const saved=a.state();a.run(`openItineraryEditor('2026-06-02');closeEntryDialog();`);assert.deepEqual(a.state(),saved);
+});
+test('an itinerary draft is not saved over a plan changed while its editor is open',()=>{
+  const a=app();a.run(`saveProject({name:'Trip',defaultFundId:'june',startDate:'2026-06-01',endDate:'2026-06-03'});
+    openItineraryEditor('2026-06-02');Itinerary.setDay(selectedProject(),'2026-06-02','Other edit');saveItineraryDialog({itineraryText:'My draft'});`);
+  assert.equal(a.state().projects[0].dailyPlans[0].note,'Other edit');assert.equal(a.alerts.length,1);
+});
+test('double-clicking a day opens its editor; links and repeated events keep the current draft',()=>{
+  const a=app();a.run(`saveProject({name:'Trip',defaultFundId:'june',startDate:'2026-06-01',endDate:'2026-06-03'});`);
+  const card={dataset:{date:'2026-06-02'}},target={closest:selector=>selector==='.itinerary-day'?card:null};
+  a.context.gestureEvent={target,button:0,preventDefault(){}};
+  a.run('els.projectPlanPanel.listeners.dblclick(gestureEvent)');
+  assert.equal(a.run('itineraryEditor.date'),'2026-06-02');assert.equal(a.run('els.dialog.open'),true);
+  a.run("els.fields.innerHTML='draft';els.projectPlanPanel.listeners.dblclick(gestureEvent)");assert.equal(a.run('els.fields.innerHTML'),'draft');
+  a.run('closeEntryDialog()');a.context.gestureEvent.target={closest:selector=>selector==='.itinerary-day'?card:{}};
+  a.run('els.projectPlanPanel.listeners.dblclick(gestureEvent)');assert.equal(a.run('els.dialog.open'),false);
+});
 test('app creates projects without migration prompts and posts/edits payments in the dated month',()=>{
   const a=app();
   a.run(`saveProject({name:'Trip',defaultFundId:'june',startDate:'2026-08-01',endDate:'2026-08-05'});
@@ -88,6 +115,13 @@ test('app validates imports before replacement and stores a recovery copy',()=>{
 if(process.env.MONEY_BACKUP_TEST_PATH) test('real backup app migration and legacy handlers preserve settlement payments and resolve only reviewed records',()=>{
   const original=JSON.parse(fs.readFileSync(process.env.MONEY_BACKUP_TEST_PATH,'utf8')),a=app(original);
   assert.deepEqual(a.state().months,original.months);
+  const beforeReading=a.state();
+  a.run('for(const project of state.projects) renderProjectPlan(project);');
+  assert.deepEqual(a.state(),beforeReading);
+  original.projects.forEach((project,index)=>{
+    assert.equal(a.state().projects[index].planText,project.planText||'');
+    assert.deepEqual(a.state().projects[index].dailyPlans,project.dailyPlans||[]);
+  });
   const pending=a.state().projects.find(p=>Projects.pendingEntries(p).length>=2),entry=pending.entries[0];
   a.run(`selectedProjectId=${JSON.stringify(pending.id)};editingId=${JSON.stringify(entry.id)};
     completeOrReopenProject();`);

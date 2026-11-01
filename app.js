@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 3;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.11.01.3";
+const APP_VERSION = "2026.11.01.4";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -649,8 +649,8 @@ const I18N = {
     importFailed: "导入失败。请选择这个 app 导出的 JSON 备份文件。"
   }
 };
-Object.assign(I18N.en, PROJECT_COPY.en);
-Object.assign(I18N.zh, PROJECT_COPY.zh);
+Object.assign(I18N.en, PROJECT_COPY.en, ITINERARY_COPY.en);
+Object.assign(I18N.zh, PROJECT_COPY.zh, ITINERARY_COPY.zh);
 const ENGLISH_NAME_MAP = {
   "收入": "Income",
   "ptcgp收入": "PTCGP Income",
@@ -867,7 +867,6 @@ let availableRoleFilter = "spending";
 let allocationRowEdit = null;
 let moneyStructureMode = "role";
 let projectDetailSection = "records";
-let projectPlanMode = "notes";
 let supabaseClient = null;
 let syncSession = null;
 let syncInFlight = false;
@@ -964,17 +963,9 @@ const els = {
   projectOverviewPanel: document.querySelector("#projectOverviewPanel"),
   projectRecordsPanel: document.querySelector("#projectRecordsPanel"),
   projectPlanPanel: document.querySelector("#projectPlanPanel"),
-  projectPlanModeToggle: document.querySelector("#projectPlanModeToggle"),
   projectPlanNotesPanel: document.querySelector("#projectPlanNotesPanel"),
-  projectPlanDailyPanel: document.querySelector("#projectPlanDailyPanel"),
   projectDailyPlanList: document.querySelector("#projectDailyPlanList"),
   projectPlanDisplay: document.querySelector("#projectPlanDisplay"),
-  projectPlanEditor: document.querySelector("#projectPlanEditor"),
-  projectPlanActions: document.querySelector("#projectPlanActions"),
-  projectPlanTextarea: document.querySelector("#projectPlanTextarea"),
-  projectPlanEditBtn: document.querySelector("#projectPlanEditBtn"),
-  projectPlanSaveBtn: document.querySelector("#projectPlanSaveBtn"),
-  projectPlanCancelBtn: document.querySelector("#projectPlanCancelBtn"),
   projectBreakdownBar: document.querySelector("#projectBreakdownBar"),
   projectBreakdownList: document.querySelector("#projectBreakdownList"),
   projectEntriesList: document.querySelector("#projectEntriesList"),
@@ -1173,14 +1164,12 @@ els.projectDetailTabs.addEventListener("click", event => {
   if (!tab) return;
   setProjectDetailSection(tab.dataset.projectSection);
 });
-els.projectPlanModeToggle.addEventListener("click", event => {
-  const button = event.target.closest("[data-project-plan-mode]");
-  if (!button) return;
-  setProjectPlanMode(button.dataset.projectPlanMode);
+document.querySelector("#itineraryDateJump").addEventListener("change", event => {
+  jumpToItineraryDate(event.target.value);
+  event.target.blur();
 });
-els.projectPlanEditBtn.addEventListener("click", startProjectPlanEdit);
-els.projectPlanCancelBtn.addEventListener("click", cancelProjectPlanEdit);
-els.projectPlanSaveBtn.addEventListener("click", saveProjectPlan);
+document.querySelector("#itineraryTodayBtn").addEventListener("click", () => jumpToItineraryDate(localDateId(new Date())));
+bindItineraryGestures(els.projectPlanPanel);
 els.deleteProjectBtn.addEventListener("click", deleteSelectedProject);
 els.settleProjectBtn.addEventListener("click", settleOrReopenProject);
 els.updateNowBtn.addEventListener("click", activateWaitingServiceWorker);
@@ -2186,15 +2175,9 @@ function renderStaticLanguage() {
   document.querySelector("#nextYearBtn").setAttribute("aria-label", t("nextYear"));
   document.querySelector("#projectOverviewPanel h2").textContent = t("fundBreakdown");
   document.querySelector("#projectRecordsPanel h2").textContent = t("entries");
-  document.querySelector("#projectPlanPanel h2").textContent = t("plan");
-  els.projectPlanModeToggle.querySelector("[data-project-plan-mode=\"notes\"]").textContent = t("projectPlanNotes");
-  els.projectPlanModeToggle.querySelector("[data-project-plan-mode=\"daily\"]").textContent = t("projectPlanDaily");
+  document.querySelector("#projectPlanPanel h2").textContent = t("itinerary");
   els.projectDetailTabs.querySelector("[data-project-section=\"records\"]").textContent = t("records");
-  els.projectDetailTabs.querySelector("[data-project-section=\"plan\"]").textContent = t("plan");
-  els.projectPlanEditBtn.textContent = t("edit");
-  els.projectPlanSaveBtn.textContent = t("save");
-  els.projectPlanCancelBtn.textContent = t("cancel");
-  els.projectPlanTextarea.placeholder = t("projectPlanPlaceholder");
+  els.projectDetailTabs.querySelector("[data-project-section=\"plan\"]").textContent = t("itinerary");
   els.deleteProjectBtn.textContent = t("deleteProject");
   els.addProjectEntryBtn.textContent = t("add");
   document.querySelector(".project-entries-table th:nth-child(1)").textContent = t("date");
@@ -3338,171 +3321,15 @@ function setProjectDetailSection(section = projectDetailSection) {
   els.projectPlanPanel.hidden = projectDetailSection !== "plan";
 }
 
-function renderProjectPlan(project) {
-  project.planMode = project.planMode === "daily" ? "daily" : "notes";
-  project.dailyPlans = normalizeProjectDailyPlans(project.dailyPlans);
-  projectPlanMode = project.planMode;
-  setProjectPlanMode(projectPlanMode, { skipSave: true });
-  renderProjectPlanNotes(project);
-  renderProjectDailyPlan(project);
-  updateProjectPlanActionVisibility();
-}
+function renderProjectPlan(project) { renderItinerary(project); }
 
-function setProjectPlanMode(mode, options = {}) {
-  const nextMode = mode === "daily" ? "daily" : "notes";
-  projectPlanMode = nextMode;
-  const project = selectedProject();
-  if (project) {
-    project.planMode = nextMode;
-    if (!options.skipSave) {
-      project.updatedAt = nowStamp();
-      markFinancialDirty();
-      saveState();
-    }
-  }
-  els.projectPlanModeToggle.querySelectorAll("[data-project-plan-mode]").forEach(button => {
-    const active = button.dataset.projectPlanMode === nextMode;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-  els.projectPlanNotesPanel.hidden = nextMode !== "notes";
-  els.projectPlanDailyPanel.hidden = nextMode !== "daily";
-  els.projectPlanEditBtn.hidden = nextMode === "daily";
-  updateProjectPlanActionVisibility();
-}
-
-function updateProjectPlanActionVisibility() {
-  els.projectPlanActions.hidden = projectPlanMode === "notes" && els.projectPlanEditor.hidden;
-}
-
-function renderProjectPlanNotes(project) {
-  const text = typeof project.planText === "string" ? project.planText : "";
-  els.projectPlanDisplay.hidden = false;
-  els.projectPlanEditor.hidden = true;
-  updateProjectPlanActionVisibility();
-  els.projectPlanDisplay.innerHTML = text.trim()
-    ? `<div class="project-plan-lines">${renderProjectPlanText(text)}</div>`
-    : `<p class="empty compact-empty project-plan-empty">${t("noProjectPlan")}</p>`;
-  els.projectPlanTextarea.value = text;
-}
-
-function renderProjectDailyPlan(project) {
-  const days = projectPlanDays(project);
-  if (!days.length) {
-    els.projectDailyPlanList.innerHTML = `<p class="empty compact-empty project-plan-empty">${t("noProjectDateRange")}</p>`;
-    return;
-  }
-  const plans = dailyPlanMap(project);
-  els.projectDailyPlanList.innerHTML = days.map((date, index) => {
-    const plan = plans.get(date) || { date, note: "" };
-    const note = plan.note || "";
-    return `
-      <article class="project-day-card">
-        <div class="project-day-head">
-          <div>
-            <strong>${escapeHtml(formatShortDate(date))}</strong>
-            <span>${escapeHtml(formatWeekdayShort(date))}</span>
-            <span>Day ${index + 1}</span>
-          </div>
-        </div>
-        <textarea data-project-day="${escapeAttr(date)}" rows="4" placeholder="${escapeAttr(t("projectDailyPlanPlaceholder"))}">${escapeHtml(note)}</textarea>
-      </article>
-    `;
-  }).join("");
-}
-
-function renderProjectPlanText(text) {
-  return String(text).split(/\r?\n/).map(line => {
-    const className = isProjectPlanDateHeading(line.trim())
-      ? "project-plan-line project-plan-date-line"
-      : "project-plan-line";
-    return `<div class="${className}">${line ? escapeHtml(line) : "&nbsp;"}</div>`;
-  }).join("");
-}
-
-function isProjectPlanDateHeading(value) {
-  return /^(\d{1,2}[.\/-]\d{1,2}([.\/-]\d{2,4})?|\d{4}[.\/-]\d{1,2}[.\/-]\d{1,2})$/.test(value);
-}
-
-function normalizeProjectDailyPlans(value) {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set();
-  return value
-    .map(item => ({
-      date: typeof item?.date === "string" ? item.date : "",
-      note: typeof item?.note === "string" ? item.note : ""
-    }))
-    .filter(item => {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date) || seen.has(item.date)) return false;
-      seen.add(item.date);
-      return true;
-    });
-}
+function normalizeProjectDailyPlans(value) { return Itinerary.normalizePlans(value); }
 
 function dailyPlanMap(project) {
   return new Map(normalizeProjectDailyPlans(project.dailyPlans).map(plan => [plan.date, plan]));
 }
 
-function projectPlanDays(project) {
-  if (!project?.startDate || !project?.endDate) return [];
-  const start = parseLocalDate(project.startDate);
-  const end = parseLocalDate(project.endDate);
-  if (!start || !end || start > end) return [];
-  const days = [];
-  const cursor = new Date(start);
-  while (cursor <= end && days.length < 62) {
-    days.push(localDateId(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return days;
-}
-
-function parseLocalDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function startProjectPlanEdit() {
-  const project = selectedProject();
-  if (!project) return;
-  els.projectPlanTextarea.value = project.planText || "";
-  els.projectPlanDisplay.hidden = true;
-  els.projectPlanEditor.hidden = false;
-  els.projectPlanActions.hidden = false;
-  requestAnimationFrame(() => els.projectPlanTextarea.focus());
-}
-
-function cancelProjectPlanEdit() {
-  const project = selectedProject();
-  if (project) renderProjectPlan(project);
-}
-
-function saveProjectPlan() {
-  const project = selectedProject();
-  if (!project) return;
-  if (projectPlanMode === "daily") {
-    els.projectPlanActions.hidden = false;
-    const existing = dailyPlanMap(project);
-    els.projectDailyPlanList.querySelectorAll("[data-project-day]").forEach(input => {
-      const date = input.dataset.projectDay;
-      const note = input.value.trimEnd();
-      if (note || existing.has(date)) existing.set(date, { date, note });
-    });
-    project.dailyPlans = [...existing.values()]
-      .filter(plan => plan.note.trim())
-      .sort((a, b) => a.date.localeCompare(b.date));
-  } else {
-    project.planText = els.projectPlanTextarea.value.trimEnd();
-  }
-  project.planMode = projectPlanMode;
-  project.updatedAt = nowStamp();
-  projectDetailSection = "plan";
-  markFinancialDirty();
-  saveState();
-  render();
-  showToast(t("savedToast"));
-}
+function projectPlanDays(project) { return Itinerary.days(project); }
 
 function projectTotal(project) { return ProjectLedger.total(state, project.id); }
 
@@ -3565,6 +3392,8 @@ document.body.addEventListener("click", event => {
   if (!button) return;
 
   const { action, id } = button.dataset;
+  if (action === "edit-trip-notes") openItineraryEditor();
+  if (action === "edit-itinerary-day") openItineraryEditor(button.dataset.date);
   if (action === "switch-tab") showTab(button.dataset.tab);
   if (action === "set-record-filter") {
     recordFilterValue = button.dataset.filter || "All";
@@ -4359,6 +4188,7 @@ function saveEntry(event) {
   const data = Object.fromEntries(new FormData(els.form).entries());
   const month = currentMonth();
 
+  if (dialogMode === "itinerary") { saveItineraryDialog(data); return; }
   if (dialogMode === "expense") { saveRealExpense(data); return; }
   if (dialogMode === "legacyProjectEntry") { saveRealExpense(data, editingId); return; }
   if (dialogMode === "projectLink") { saveProjectExpenseLinks(data); return; }
@@ -5378,14 +5208,7 @@ function canLeaveMonth() {
     if (allocationRowEdit) return false;
   }
 
-  const project = selectedProject();
-  if (!project) return true;
-  const notesChanged = !els.projectPlanEditor.hidden &&
-    els.projectPlanTextarea.value.trimEnd() !== (project.planText || "").trimEnd();
-  const plans = dailyPlanMap(project);
-  const dailyChanged = [...els.projectDailyPlanList.querySelectorAll("[data-project-day]")]
-    .some(input => input.value.trimEnd() !== (plans.get(input.dataset.projectDay)?.note || "").trimEnd());
-  return !(notesChanged || dailyChanged) || window.confirm(t("discardPlanOnMonthChange"));
+  return true;
 }
 
 function switchMonth(monthId) {

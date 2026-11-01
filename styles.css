@@ -4135,175 +4135,135 @@ menu .dialog-delete-btn {
   display: none;
 }
 
-.project-plan-mode {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0 18px 14px;
-}
-
-.project-plan-title-actions {
-  align-items: center;
-  gap: 8px;
-}
-
-.project-plan-mode.compact {
-  width: auto;
-  min-width: 148px;
-  margin: 0;
-  padding: 4px;
-}
-
-.project-plan-mode button {
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.project-plan-mode.compact button {
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: 13px;
-}
-
-.project-plan-display {
-  padding: 0 18px 18px;
-  color: var(--text);
-  font-size: 15px;
-  line-height: 1.55;
-}
-
-.project-plan-empty {
-  margin: 0;
-}
-
-.project-plan-lines {
-  display: grid;
-  gap: 2px;
-}
-
-.project-plan-line {
-  min-height: 1.35em;
-  white-space: pre-wrap;
-}
-
-.project-plan-date-line {
-  margin-top: 10px;
-  font-weight: 760;
-}
-
-.project-plan-line:first-child {
-  margin-top: 0;
-}
-
-.project-plan-editor {
-  padding: 0 18px 18px;
-}
-
-.project-plan-editor textarea {
-  width: 100%;
-  min-height: 260px;
-  resize: vertical;
+/* Itineraries read as a document; editors open one day at a time. */
+.itinerary-notes,
+.itinerary-other-dates {
+  margin: 0 18px 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 10px;
   background: #fff;
+}
+
+.itinerary-notes summary,
+.itinerary-other-dates summary {
+  padding: 14px;
+  cursor: pointer;
   color: var(--text);
-  font: inherit;
-  line-height: 1.5;
+  font-size: 14px;
 }
 
-.project-plan-daily {
-  padding: 0 18px 18px;
-}
-
-.project-day-list {
-  display: grid;
-  gap: 10px;
-}
-
-.project-day-card {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  padding: 12px;
-}
-
-.project-day-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.project-day-head div {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.project-day-head strong {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 760;
-}
-
-.project-day-head span {
-  color: var(--muted);
+.itinerary-notes summary span {
+  display: block;
+  margin: 5px 0 0 16px;
   font-size: 12px;
-  font-weight: 700;
-}
-
-.project-day-card textarea {
-  width: 100%;
-  min-height: 108px;
-  resize: vertical;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px;
-  background: #fff;
-  color: var(--text);
-  font: inherit;
+  color: var(--muted);
   line-height: 1.45;
 }
 
-.project-plan-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 0 18px 18px;
-  margin-top: 12px;
+.itinerary-notes-content {
+  padding: 0 14px 14px;
 }
 
-.project-plan-actions[hidden] {
-  display: none;
+.itinerary-notes-content button {
+  margin-top: 14px;
+}
+
+.itinerary-section-head {
+  padding: 4px 18px 12px;
+}
+
+.itinerary-section-head h3 { font-size: 15px; }
+.itinerary-section-head p { margin-top: 6px; }
+
+.itinerary-navigation {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0 18px 16px;
+}
+
+.itinerary-navigation label {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.itinerary-navigation select { width: 100%; min-width: 0; }
+.itinerary-navigation button { min-height: 36px; }
+
+.itinerary-days {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+.itinerary-day {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  scroll-margin-top: 16px;
+  touch-action: manipulation;
+}
+
+.itinerary-day.is-today { border-color: var(--blue); }
+.itinerary-day:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+.itinerary-day-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.itinerary-day-head > div { min-width: 0; }
+.itinerary-day-head strong { display: block; font-size: 15px; }
+.itinerary-day-head span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+.itinerary-day-head button { flex-shrink: 0; font-size: 13px; }
+
+.itinerary-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.itinerary-text a { color: var(--blue); text-underline-offset: 3px; }
+.itinerary-empty { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0; }
+.itinerary-other-dates > p { padding: 0 14px 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.itinerary-other-dates .itinerary-days { padding: 0 14px 14px; }
+
+dialog[data-mode="itinerary"] textarea {
+  width: 100%;
+  min-height: 230px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #fff;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+dialog[data-mode="itinerary"] menu {
+  position: sticky;
+  bottom: -18px;
+  padding: 12px 0 0;
+  background: #fff;
 }
 
 @media (max-width: 640px) {
-  .project-detail-tabs {
-    margin: -2px 0 12px;
-  }
-
-  .project-plan-mode {
-    margin-inline: 12px;
-  }
-
-  .project-plan-mode.compact {
-    min-width: 136px;
-    margin: 0;
-  }
-
-  .project-plan-mode.compact button {
-    min-height: 30px;
-    padding-inline: 8px;
-  }
-
-  .project-plan-display,
-  .project-plan-editor,
-  .project-plan-daily {
-    padding-inline: 12px;
-  }
-
-  .project-plan-actions {
-    padding-inline: 12px;
-  }
+  .project-detail-tabs { margin: -2px 0 12px; }
+  .itinerary-notes,
+  .itinerary-other-dates { margin-inline: 12px; }
+  .itinerary-navigation,
+  .itinerary-section-head,
+  .itinerary-days { padding-inline: 12px; }
 }
