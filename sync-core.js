@@ -97,7 +97,7 @@
     }
     return { value, conflicts: [...new Set(conflicts)] };
   }
-  function validLedger(data, maxVersion = 2) {
+  function validLedger(data, maxVersion = 3) {
     if (!isObject(data) || !isObject(data.months) || !Object.keys(data.months).length) return false;
     const version = Number(data.dataVersion || 1);
     if (!Number.isSafeInteger(version) || version < 1 || version > maxVersion) return false;
@@ -107,6 +107,8 @@
   function ledgerIssues(data) {
     if (!validLedger(data)) return ["invalid-ledger"];
     const issues = [];
+    const projectIds = new Set((data.projects || []).map(project => project.id));
+    const expenseIds = new Set();
     const keys = Object.keys(data.months).sort();
     keys.forEach((key, index) => {
       const month = data.months[key];
@@ -117,6 +119,9 @@
       if (Math.round((allocated - income) * 100) > 0) issues.push(`overallocated/${key}/${Math.round((allocated - income) * 100)}`);
       month.expenses.forEach(expense => {
         if (!names.has(expense.category)) issues.push(`missing-category/${key}/${expense.id}`);
+        if (Number(data.dataVersion) >= 3 && expense.projectId && !projectIds.has(expense.projectId)) issues.push(`missing-project/${key}/${expense.id}`);
+        if (expenseIds.has(expense.id)) issues.push(`duplicate-expense/${expense.id}`);
+        expenseIds.add(expense.id);
       });
       if (!index) return;
       const previous = data.months[keys[index - 1]];

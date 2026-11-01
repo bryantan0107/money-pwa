@@ -69,7 +69,7 @@ test('privacy, language, backup state and month selection stay local',()=>{
   assert.equal(result.language,'zh');assert.equal(result.privacyMode,true);assert.equal(result.currentMonth,'2026-05');
 });
 test('unsupported data versions and duplicate record ids are rejected',()=>{
-  const data=ledger();data.dataVersion=3;assert.equal(Sync.validLedger(data),false);
+  const data=ledger();data.dataVersion=4;assert.equal(Sync.validLedger(data),false);
   data.dataVersion=2;data.months['2026-05'].expenses=[expense('same'),expense('same')];assert.equal(Sync.validLedger(data),false);
 });
 test('project settlement versus editing its entries conflicts',()=>{

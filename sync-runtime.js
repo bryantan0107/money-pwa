@@ -4,8 +4,13 @@ function syncConfig() {
   return { supabaseUrl: String(config.supabaseUrl || "").trim(), supabaseAnonKey: String(config.supabaseAnonKey || "").trim() };
 }
 function isCloudSyncConfigured() {
+  if (isLocalProjectPreview()) return false;
   const config = syncConfig();
   return Boolean(config.supabaseUrl && config.supabaseAnonKey);
+}
+function isLocalProjectPreview() {
+  return ["localhost", "127.0.0.1", "::1"].includes(location.hostname) &&
+    new URLSearchParams(location.search).get("preview") === "local";
 }
 function syncStorageKey(part, userId = syncUserId) { return `${SYNC_PREFIX}${userId}:${part}`; }
 function readSyncStorage(part, fallback = null) {
@@ -94,7 +99,7 @@ function renderCloudSyncStatus(message = "") {
   els.syncNowBtn.textContent = t("syncNow");
   els.syncBackupBtn.textContent = t("syncRecoveryBackup");
   let text = message;
-  if (!configured) text = t("cloudSyncNotConfigured");
+  if (!configured) text = t(isLocalProjectPreview() ? "localPreview" : "cloudSyncNotConfigured");
   else if (recovery) text = t("cloudSyncPasswordRecovery");
   else if (!supabaseClient && syncInitialized) text = t("syncUnavailable");
   else if (!signedIn) text ||= syncPhase === "error" ? t("cloudSyncError") : t("cloudSyncSignedOut");

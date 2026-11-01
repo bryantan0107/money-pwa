@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=month-nav-1">
+    <link rel="stylesheet" href="styles.css?v=project-ledger-1">
   </head>
   <body>
     <div class="app-shell">
@@ -39,6 +39,8 @@
           </div>
         </div>
       </header>
+
+      <section id="localPreviewNotice" class="local-preview-notice" hidden></section>
 
       <section id="updateBanner" class="update-banner" hidden>
         <div>
@@ -377,7 +379,7 @@
               <strong id="projectDetailStatus" class="status-pill is-active"><i></i><span>Active</span></strong>
             </div>
             <div class="project-money-line">
-              <strong id="projectDetailTotal">0.00</strong>
+              <div><span id="projectSpendingLabel" class="project-spending-label">Total spent</span><strong id="projectDetailTotal">0.00</strong></div>
               <button id="projectDetailMetaBtn" class="project-meta-button" type="button">
                 <span id="projectDetailDates">May 1 - May 6</span>
                 <span id="projectDetailDefaultFund">Savings</span>
@@ -406,9 +408,11 @@
             <div class="panel-title">
               <h2>Entries</h2>
               <div class="inline-actions">
+                <button id="linkProjectExpenseBtn" class="secondary-action" type="button">Link existing expenses</button>
                 <button id="addProjectEntryBtn" class="primary-action" type="button">Add</button>
               </div>
             </div>
+            <section id="projectLegacyPanel" class="project-legacy-panel" hidden></section>
             <div class="table-wrap project-entries-wrap">
               <table class="project-entries-table compact-data-table">
                 <thead>
@@ -422,6 +426,7 @@
                 <tbody id="projectEntriesList"></tbody>
               </table>
             </div>
+            <details id="projectOriginalDetails" class="project-original-details" hidden></details>
           </section>
 
           <section id="projectPlanPanel" class="panel project-plan-panel" data-project-panel="plan" hidden>
@@ -486,9 +491,11 @@
     </dialog>
 
     <script src="vendor/supabase.js"></script>
-    <script src="sync-core.js?v=sync-v2-1"></script>
-    <script src="sync-runtime.js?v=sync-v2-1"></script>
+    <script src="sync-core.js?v=project-ledger-1"></script>
+    <script src="projects-core.js?v=project-ledger-1"></script>
+    <script src="project-ui.js?v=project-ledger-1"></script>
+    <script src="sync-runtime.js?v=project-ledger-1"></script>
     <script src="sync-config.js?v=category-metadata-1"></script>
-    <script src="app.js?v=month-nav-1"></script>
+    <script src="app.js?v=project-ledger-1"></script>
   </body>
 </html>

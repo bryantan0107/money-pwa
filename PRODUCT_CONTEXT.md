@@ -60,11 +60,14 @@ This file records long-term product direction and user preferences for this proj
 - Recent Expenses and Records should both use ledger-style date-descending order.
 - Same-day records should use hidden `createdAt` timestamps as a tie-breaker, without showing or requiring a time field in normal forms.
 - Keep `createdAt` and `updatedAt` in the data model for income, expenses, funds, projects, and project entries to support future richer sorting/editing.
-- Projects are temporary ledgers for trips, events, shopping plans, moving, and other multi-entry situations.
-- Project entries do not directly affect fund balances. Only settlement creates official expense records.
-- A Project has one default fund, but each Project entry can choose its own fund.
-- Settling a Project groups entries by fund and creates one official expense per fund.
-- Settled Projects should be treated as locked unless reopened, which removes settlement-generated expenses.
+- Expenses are independent financial records; an expense can optionally belong to one Project for cross-month grouping.
+- Projects group spending for trips, events, and similar situations. Their total is the sum of linked real expenses across all months.
+- Adding an expense inside a Project immediately posts it in its payment-date month and deducts its category. The Project supplies a default category, which can be changed for each expense.
+- Existing expenses can be linked to a Project without another deduction. Editing from either surface changes the same expense.
+- Completing/reopening a Project changes only its status. Completed Projects remain editable. Deleting a Project unlinks and retains its real expenses and balances.
+- Old settled Projects retain their original aggregate settlement expenses and read-only original entry details. Never recreate or split historical payments automatically.
+- Old active Project entries need one-time explicit review: post with payment date/category, link an existing expense, or skip. Store each resolution durably; prevent completion/deletion until all old entries are reviewed. New Projects have no such prompt.
+- Preserve Project notes and daily plans. Do not introduce forecast budgets or a paid/unpaid workflow for new project entries.
 - Detail pages should feel like separate mobile app screens.
 - Homepage-only summary elements should not follow into detail pages.
 - `Balance Detail` pages should not show the top income summary strip.
@@ -86,7 +89,7 @@ This file records long-term product direction and user preferences for this proj
 - Bottom navigation is now part of the mobile-first direction. Keep it simple and iOS-like:
   - Home for daily overview and available balance
   - Records for income and expense records
-  - Projects for temporary ledgers before settlement
+  - Projects for cross-month expense grouping and plans
   - Settings for backup, restore, currency, and future app settings
 - Detail pages should keep bottom navigation visible for consistent mobile app navigation.
 - Backup and restore belong in Settings; do not keep a duplicate top-right overflow menu for them.
@@ -163,7 +166,7 @@ This file records long-term product direction and user preferences for this proj
 - User prefers to preview changes locally before syncing to GitHub.
 - Do not sync to GitHub unless the user asks.
 - When updating PWA assets, bump cache/version strings so the phone can receive updates.
-- Use the formal local git checkout at `/Users/bryanyijuetan/Documents/Codex/money-pwa` for future work.
+- Current working checkout: `/Users/bryanyijuetan/Documents/Codex/2026-05-16/money-pwa`.
 - Preferred fast publishing workflow after local approval:
   - make changes in the formal checkout
   - verify locally

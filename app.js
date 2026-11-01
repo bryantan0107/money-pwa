@@ -5,9 +5,9 @@ const BACKUP_REMINDER_DAYS = 7;
 const DEFAULT_FUND_SORT = "available-desc";
 const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.11.01.1";
+const APP_VERSION = "2026.11.01.2";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -649,6 +649,8 @@ const I18N = {
     importFailed: "导入失败。请选择这个 app 导出的 JSON 备份文件。"
   }
 };
+Object.assign(I18N.en, PROJECT_COPY.en);
+Object.assign(I18N.zh, PROJECT_COPY.zh);
 const ENGLISH_NAME_MAP = {
   "收入": "Income",
   "ptcgp收入": "PTCGP Income",
@@ -841,6 +843,7 @@ let syncPristine = !localStorage.getItem(STORAGE_KEY);
 let state = loadState();
 let dialogMode = null;
 let editingId = null;
+let editingMonthId = null;
 let noteSuggestionsHideTimer = null;
 let selectedFundId = null;
 let selectedProjectId = null;
@@ -1154,8 +1157,9 @@ els.detailFundName.addEventListener("click", event => {
 });
 els.addProjectEntryBtn.addEventListener("click", () => {
   const project = selectedProject();
-  if (project && project.status !== "settled") openDialog("projectEntry", null, { fundId: project.defaultFundId });
+  if (project) openDialog("expense", null, { projectId: project.id, category: projectDefaultCategoryName(project) });
 });
+document.querySelector("#linkProjectExpenseBtn").addEventListener("click", () => openDialog("projectLink"));
 els.projectDetailName.addEventListener("click", () => {
   const project = selectedProject();
   if (project) openDialog("project", project.id);
@@ -1256,6 +1260,8 @@ els.form.addEventListener("change", updateAllocationEditor);
 els.form.addEventListener("input", updateQuickAllocatePreview);
 els.form.addEventListener("change", updateQuickAllocatePreview);
 els.form.addEventListener("change", updateCategoryFixedFields);
+els.form.addEventListener("change", updateExpenseDateOptions);
+els.form.addEventListener("input", filterProjectExpenseChoices);
 els.form.addEventListener("input", updateNoteAutocomplete);
 els.form.addEventListener("click", applyNoteSuggestion);
 els.form.addEventListener("click", hideNoteSuggestionsOnOutsideClick);
@@ -1395,6 +1401,7 @@ function normalizeStateLanguage(rawState) {
     });
   });
   repairCategoryLifecycleGaps(rawState);
+  ProjectLedger.migrate(rawState);
   return rawState;
 }
 
@@ -1597,19 +1604,7 @@ function confirmLaterMonthUpdate() {
 }
 
 function cascadeLaterMonthStarts(fromMonthId = state.currentMonth) {
-  const keys = sortedMonthKeys();
-  let previousKey = fromMonthId;
-  keys.filter(key => key > fromMonthId).forEach(key => {
-    const previous = state.months[previousKey];
-    const month = state.months[key];
-    month.funds.forEach(fund => {
-      const previousFund = previous.funds.find(item => item.name === fund.name);
-      if (previousFund) {
-        fund.start = balanceFor(previousFund, previous);
-      }
-    });
-    previousKey = key;
-  });
+  ProjectLedger.cascade(state, fromMonthId);
 }
 
 function syncCreatedCategoryToLaterMonths(createdFund) {
@@ -1685,7 +1680,10 @@ function projectStartMonth(project) {
 }
 
 function isProjectVisibleInMonth(project, monthId) {
-  return Boolean(project) && monthId >= projectStartMonth(project);
+  if (!project) return false;
+  const firstPaymentMonth = ProjectLedger.projectExpenses(state, project.id)
+    .map(row => row.monthId).sort()[0];
+  return monthId >= [projectStartMonth(project), firstPaymentMonth].filter(Boolean).sort()[0];
 }
 
 function visibleProjectsForMonth(monthId = state.currentMonth) {
@@ -1848,7 +1846,8 @@ function categoryEventTypeLabel(type) {
     "move-in": t("moveIn"),
     "move-out": t("moveOut"),
     expense: t("expense"),
-    "project-settlement": t("projectSettlement")
+    "project-settlement": t("projectSettlement"),
+    "project-expense": t("projectExpense")
   };
   return labels[type] || t("records");
 }
@@ -2062,6 +2061,9 @@ function renderMonthSelect() {
 }
 
 function renderStaticLanguage() {
+  const preview = document.querySelector("#localPreviewNotice");
+  preview.hidden = !isLocalProjectPreview();
+  preview.textContent = t("localPreview");
   document.documentElement.lang = currentLanguage() === "zh" ? "zh-Hans" : "en";
   els.languageSelect.value = currentLanguage();
   els.privacyToggleBtn.classList.toggle("is-private", state.privacyMode);
@@ -2903,7 +2905,7 @@ function renderDetail() {
       <tr class="${editAction ? "clickable-row" : ""}" ${editAttrs}>
         <td>${escapeHtml(record.date)}</td>
         <td>${escapeHtml(categoryEventTypeLabel(record.type))}</td>
-        <td>${escapeHtml(record.note || "-")}</td>
+        <td>${escapeHtml(record.note || "-")}${projectBadge(record.projectId)}</td>
         <td class="number ${record.amount < 0 ? "is-negative" : "is-positive"}">${signedMoney(record.amount)}</td>
       </tr>
     `;
@@ -2946,7 +2948,8 @@ function categoryRecordsFor(fund) {
       records.push({
         id: expense.id,
         date: expense.date,
-        type: expense.projectId ? "project-settlement" : "expense",
+        type: expense.projectId ? "project-expense" : "expense",
+        projectId: expense.projectId,
         note: expense.note || "",
         amount: -Number(expense.amount || 0),
         createdAt: expense.createdAt || fallbackTimestamp(expense.date),
@@ -3053,7 +3056,7 @@ function renderRecords() {
       <tr class="clickable-row ${record.kind === "income" ? "income-row" : "expense-row"}" data-action="edit-record" data-kind="${record.kind}" data-id="${record.id}" tabindex="0" aria-label="${escapeAttr(t("editRecord", record.category, money(record.amount)))}">
         <td>${escapeHtml(record.date)}</td>
         <td>${escapeHtml(record.category)}</td>
-        <td>${escapeHtml(record.note || "")}</td>
+        <td>${escapeHtml(record.note || "")}${projectBadge(record.projectId)}</td>
         <td class="number">${record.kind === "income" ? "+" : "-"}${money(record.amount)}</td>
       </tr>
     `).join("")
@@ -3237,6 +3240,8 @@ function unifiedRecords() {
     ...month.expenses.map(expense => ({
       id: expense.id,
       kind: "expense",
+      projectId: expense.projectId,
+      projectName: projectNameFor(expense.projectId),
       date: expense.date,
       category: expense.category,
       note: expense.note || "",
@@ -3289,6 +3294,7 @@ function recordMatchesSearch(record, query) {
     record.kind,
     record.category,
     record.note,
+    record.projectName,
     String(record.amount),
     money(record.amount)
   ].join(" ").toLowerCase();
@@ -3314,82 +3320,9 @@ function renderProjects() {
     : `<p class="empty">${t("noProjects")}</p>`;
 }
 
-function renderProjectCard(project) {
-  const total = projectTotal(project);
-  const breakdown = projectBreakdown(project);
-  const defaultFund = projectDefaultCategoryName(project);
-  return `
-    <article class="project-card ${project.status === "settled" ? "is-settled" : ""}" data-action="view-project" data-id="${project.id}">
-      <div class="project-card-head">
-        <div>
-          <h3>${escapeHtml(project.name)}</h3>
-        </div>
-        <strong>${money(total)}</strong>
-      </div>
-      <div class="project-card-meta">
-        <span>${escapeHtml(projectDateRange(project))}</span>
-        <span>${escapeHtml(defaultFund || "-")}</span>
-        <span>${escapeHtml(t("started"))} ${escapeHtml(formatMonthLabel(projectStartMonth(project)))}</span>
-        <span class="status-pill compact ${project.status === "settled" ? "is-settled" : ""}"><i></i><span>${project.status === "settled" ? t("settled") : t("active")}</span></span>
-      </div>
-      <div class="mini-breakdown">${renderAllocationBarSegments(breakdown, total)}</div>
-    </article>
-  `;
-}
+function renderProjectCard(project) { return renderRealProjectCard(project); }
 
-function renderProjectDetail() {
-  const project = selectedProject();
-  if (!project) return;
-
-  const total = projectTotal(project);
-  const breakdown = projectBreakdown(project);
-  const isSettled = project.status === "settled";
-  const entries = [...project.entries].sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
-
-  els.projectDetailName.textContent = project.name;
-  els.projectDetailStatus.classList.toggle("is-active", !isSettled);
-  els.projectDetailStatus.classList.toggle("is-settled", isSettled);
-  els.projectDetailStatus.innerHTML = `<i></i><span>${isSettled ? t("settled") : t("active")}</span>`;
-  els.projectDetailTotal.textContent = money(total);
-  els.projectDetailDefaultFund.textContent = projectDefaultCategoryName(project) || "-";
-  els.projectDetailDates.textContent = projectDateRange(project);
-  els.projectDetailName.title = t("editProject");
-  els.projectDetailMetaBtn.title = t("editProject");
-  els.projectBreakdownBar.innerHTML = renderAllocationBarSegments(breakdown, total);
-  els.projectBreakdownList.innerHTML = breakdown.length
-    ? breakdown.map(item => `
-      <div class="project-breakdown-row">
-        <span><i style="--dot:${item.color}"></i>${escapeHtml(item.label)}</span>
-        <strong>${money(item.amount)}</strong>
-      </div>
-    `).join("")
-    : `<p class="empty compact-empty">${t("noProjectEntries")}</p>`;
-  els.addProjectEntryBtn.hidden = isSettled;
-  els.deleteProjectBtn.hidden = isSettled;
-  els.deleteProjectBtn.disabled = isSettled;
-  els.deleteProjectBtn.title = isSettled ? t("settledProjectDeleteDisabled") : t("deleteProject");
-  els.settleProjectBtn.textContent = isSettled ? t("reopen") : t("settle");
-  els.settleProjectBtn.disabled = !isSettled && total <= 0;
-  els.settleProjectBtn.classList.toggle("primary-action", !isSettled);
-  els.settleProjectBtn.classList.toggle("secondary-action", isSettled);
-
-  renderProjectPlan(project);
-  setProjectDetailSection(projectDetailSection);
-
-  els.projectEntriesList.innerHTML = entries.length
-    ? entries.map(entry => {
-      const categoryName = projectEntryCategoryName(entry, project) || t("other");
-      return `
-      <tr ${isSettled ? "" : `class="clickable-row" data-action="edit-project-entry" data-id="${entry.id}" data-kind="projectEntry" tabindex="0" aria-label="${escapeAttr(t("editRecord", categoryName, money(entry.amount)))}"`}>
-        <td>${escapeHtml(formatShortDate(entry.date))}</td>
-        <td>${escapeHtml(categoryName)}</td>
-        <td>${escapeHtml(entry.note || "-")}</td>
-        <td class="number">${money(entry.amount)}</td>
-      </tr>
-    `;
-    }).join("")
-    : `<tr><td colspan="4" class="empty">${isSettled ? t("projectSettledNote") : t("noProjectEntries")}</td></tr>`;
-}
+function renderProjectDetail() { renderRealProjectDetail(); }
 
 function setProjectDetailSection(section = projectDetailSection) {
   const allowed = new Set(["records", "plan"]);
@@ -3571,27 +3504,9 @@ function saveProjectPlan() {
   showToast(t("savedToast"));
 }
 
-function projectTotal(project) {
-  return project.entries.reduce((total, entry) => total + Number(entry.amount || 0), 0);
-}
+function projectTotal(project) { return ProjectLedger.total(state, project.id); }
 
-function projectBreakdown(project) {
-  const colors = ["#ff3b30", "#ff8a1f", "#f5c400", "#34a853", "#0071e3", "#8e8e93"];
-  const totals = new Map();
-  project.entries.forEach(entry => {
-    const key = projectEntryCategoryName(entry, project) || t("other");
-    totals.set(key, (totals.get(key) || 0) + Number(entry.amount || 0));
-  });
-  return [...totals.entries()]
-    .filter(([, amount]) => amount > 0)
-    .map(([category, amount], index) => ({
-      label: category,
-      amount,
-      category,
-      fundId: currentMonth().funds.find(fund => fund.name === category)?.id || "",
-      color: colors[index % colors.length]
-    }));
-}
+function projectBreakdown(project) { return realProjectBreakdown(project); }
 
 function fundById(id, month = currentMonth()) {
   return month.funds.find(fund => fund.id === id) || null;
@@ -3613,16 +3528,6 @@ function projectDefaultCategoryName(project, month = currentMonth()) {
 function projectDefaultFundInCurrentMonth(project) {
   if (!project) return null;
   return fundById(project.defaultFundId) || fundByName(project.defaultCategory);
-}
-
-function projectEntryCategoryName(entry, project, month = currentMonth()) {
-  if (!entry) return projectDefaultCategoryName(project, month);
-  return fundNameById(entry.fundId, month) || entry.category || projectDefaultCategoryName(project, month);
-}
-
-function projectEntryFundInCurrentMonth(entry, project) {
-  const categoryName = projectEntryCategoryName(entry, project);
-  return fundById(entry?.fundId) || fundByName(categoryName) || projectDefaultFundInCurrentMonth(project);
 }
 
 function projectTypeLabel(type) {
@@ -3714,12 +3619,19 @@ document.body.addEventListener("click", event => {
   if (action === "delete-fund") removeItem("funds", id);
   if (action === "edit-expense") openDialog("expense", id);
   if (action === "edit-transfer") openDialog("transfer", id);
-  if (action === "edit-project-entry" && selectedProject()?.status !== "settled") openDialog("projectEntry", id);
+  if (action === "edit-project-expense") openDialog("expense", id, { monthId: button.dataset.monthId });
+  if (action === "review-project-legacy") openDialog("legacyProjectEntry", id);
+  if (action === "link-legacy-expense") openDialog("projectLink", id);
+  if (action === "unlink-project-expense") unlinkProjectExpense(id);
+  if (action === "restore-project-legacy") {
+    const entry = selectedProject()?.entries.find(item => item.id === id && item.resolution?.kind === "dismissed");
+    if (entry) { delete entry.resolution; markFinancialDirty(); saveState(); render(); }
+  }
   if (action === "sort-detail-expenses") toggleDetailExpenseSort(button.dataset.field);
 });
 
 document.body.addEventListener("keydown", event => {
-  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-transfer'], .clickable-row[data-action='edit-project-entry'], .clickable-row[data-action='edit-inline-allocation'], .restock-card[data-action='edit-restock']");
+  const row = event.target.closest(".clickable-row[data-action='edit-record'], .clickable-row[data-action='edit-expense'], .clickable-row[data-action='edit-transfer'], .clickable-row[data-action='edit-project-expense'], .clickable-row[data-action='edit-inline-allocation'], .restock-card[data-action='edit-restock']");
   if (!row || !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
   if (row.dataset.action === "edit-inline-allocation") {
@@ -3730,12 +3642,15 @@ document.body.addEventListener("keydown", event => {
     openDialog("restock", row.dataset.id);
     return;
   }
-  if (row.dataset.action === "edit-project-entry" && selectedProject()?.status === "settled") return;
+  if (row.dataset.action === "edit-project-expense") {
+    openDialog("expense", row.dataset.id, { monthId: row.dataset.monthId });
+    return;
+  }
   if (row.dataset.action === "edit-transfer") {
     openDialog("transfer", row.dataset.id);
     return;
   }
-  openDialog(row.dataset.kind || (row.dataset.action === "edit-project-entry" ? "projectEntry" : "expense"), row.dataset.id);
+  openDialog(row.dataset.kind || "expense", row.dataset.id);
 });
 
 function toggleFundPin(id) {
@@ -3921,13 +3836,15 @@ function openDialog(mode, id = null, defaults = {}) {
   dialogMode = mode;
   editingId = id;
 
-  const month = currentMonth();
+  editingMonthId = defaults.monthId || state.currentMonth;
+  const month = state.months[editingMonthId] || currentMonth();
   const source = {
     income: month.incomes,
     fund: month.funds,
     expense: month.expenses,
     project: state.projects,
-    projectEntry: selectedProject()?.entries || [],
+    legacyProjectEntry: selectedProject()?.entries || [],
+    projectLink: selectedProject()?.entries || [],
     allocation: month.funds,
     quickAllocate: month.funds,
     transfer: month.funds,
@@ -3935,14 +3852,16 @@ function openDialog(mode, id = null, defaults = {}) {
     fixedBill: month.funds,
     restock: state.restockItems || []
   }[mode];
-  const item = id ? source.find(entry => entry.id === id) : defaults;
+  const item = id ? source?.find(entry => entry.id === id) : defaults;
+  if (id && !item) return;
 
   const titles = {
     income: id ? t("editIncome") : t("addIncome"),
     fund: id ? t("editFundDialog") : t("addFundDialog"),
     expense: id ? t("editExpense") : t("addExpense"),
     project: id ? t("editProject") : t("addProject"),
-    projectEntry: id ? t("editProjectEntry") : t("addProjectEntry"),
+    legacyProjectEntry: t("reviewLegacy"),
+    projectLink: t("linkExisting"),
     allocation: t("allocateIncome"),
     quickAllocate: t("allocateIncome"),
     transfer: id ? t("editMove") : t("moveFunds"),
@@ -3953,13 +3872,14 @@ function openDialog(mode, id = null, defaults = {}) {
   els.dialogTitle.textContent = titles[mode];
   els.dialog.dataset.mode = mode;
   const canDelete = (
-    ["income", "expense", "project", "fund", "categoryRole", "restock"].includes(mode) &&
-    Boolean(id) &&
-    !(mode === "project" && item?.status === "settled")
+    ["income", "expense", "project", "fund", "categoryRole", "restock", "legacyProjectEntry"].includes(mode) &&
+    Boolean(id)
   ) || (mode === "transfer" && Boolean(id) && Boolean(findTransferPair(id)));
   els.deleteDialogBtn.hidden = !canDelete;
   els.deleteDialogBtn.textContent = mode === "project" ? t("deleteProject") : ["income", "fund", "categoryRole", "transfer", "restock"].includes(mode) ? t("delete") : t("deleteExpense");
   els.fields.innerHTML = fieldTemplates(mode, item || {});
+  if (mode === "legacyProjectEntry") els.deleteDialogBtn.textContent = t("dismissLegacy");
+  els.form.querySelector("button[type='submit']").textContent = t(mode === "legacyProjectEntry" ? "postLegacy" : mode === "projectLink" ? "linkExisting" : "save");
   updateCategoryFixedFields();
   if (!els.dialog.open) {
     lockBackgroundScroll();
@@ -3988,6 +3908,9 @@ function updateCategoryFixedFields() {
 }
 
 function fieldTemplates(mode, item) {
+  if (mode === "expense") return expenseFields(item);
+  if (mode === "legacyProjectEntry") return expenseFields(item, true);
+  if (mode === "projectLink") return renderProjectExpensePicker(editingId);
   if (mode === "income") {
     return `
       ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
@@ -4098,22 +4021,6 @@ function fieldTemplates(mode, item) {
       </label>
       ${field(t("startDate"), "startDate", item.startDate || state.currentMonth + "-01", "date")}
       ${field(t("endDate"), "endDate", item.endDate || state.currentMonth + "-01", "date")}
-    `;
-  }
-
-  if (mode === "projectEntry") {
-    const project = selectedProject();
-    const selectedFund = projectEntryFundInCurrentMonth(item, project);
-    const funds = currentMonth().funds
-      .map(fund => `<option value="${fund.id}" ${selectedFund?.id === fund.id ? "selected" : ""}>${escapeHtml(fund.name)}</option>`)
-      .join("");
-    return `
-      ${field(t("date"), "date", item.date || defaultEntryDateForCurrentMonth(), "date")}
-      <label class="field">${t("category")}
-        <select name="fundId">${funds}</select>
-      </label>
-      ${field(t("note"), "note", item.note || "", "text")}
-      ${field(t("amount"), "amount", item.amount || "", "number")}
     `;
   }
 
@@ -4452,6 +4359,9 @@ function saveEntry(event) {
   const data = Object.fromEntries(new FormData(els.form).entries());
   const month = currentMonth();
 
+  if (dialogMode === "expense") { saveRealExpense(data); return; }
+  if (dialogMode === "legacyProjectEntry") { saveRealExpense(data, editingId); return; }
+  if (dialogMode === "projectLink") { saveProjectExpenseLinks(data); return; }
   if (dialogMode === "allocation") {
     saveAllocationEditor(data);
     return;
@@ -4484,11 +4394,6 @@ function saveEntry(event) {
 
   if (dialogMode === "project") {
     saveProject(data);
-    return;
-  }
-
-  if (dialogMode === "projectEntry") {
-    saveProjectEntry(data);
     return;
   }
 
@@ -4757,6 +4662,7 @@ function renameCategoryRecords(previousName, nextName) {
 }
 
 function deleteCurrentDialogItem() {
+  if (dialogMode === "legacyProjectEntry") { dismissProjectLegacy(editingId); return; }
   if (dialogMode === "income") {
     deleteCurrentIncome();
     return;
@@ -4877,26 +4783,13 @@ function removeCategoryFromCurrentAndLaterMonths(categoryName) {
 
 function deleteCurrentExpense() {
   if (dialogMode !== "expense" || !editingId) return;
-
-  const month = currentMonth();
-  const expense = month.expenses.find(item => item.id === editingId);
-  if (!expense) return;
-
-  const confirmMessage = expense.projectId
-    ? t("deleteSettledProjectExpenseConfirm")
-    : t("deleteExpenseConfirm");
-  if (!window.confirm(confirmMessage)) return;
-
-  month.expenses = month.expenses.filter(item => item.id !== editingId);
-  markFundUpdatedByName(expense.category);
-  unlinkSettlementExpense(expense);
-  cascadeLaterMonthStartsQuietly();
-  markFinancialDirty();
-  saveState();
-  els.dialog.close();
-  dialogMode = null;
-  editingId = null;
-  render();
+  const row = ProjectLedger.findExpense(state, editingId, editingMonthId);
+  if (!row) return;
+  const message = t(row.expense.projectId ? "deleteSettledProjectExpenseConfirm" : "deleteExpenseConfirm");
+  if (!window.confirm(message) || !confirmEarlierExpenseChange([row.monthId])) return;
+  saveSyncRecovery(state, "before-expense-delete");
+  ProjectLedger.deleteExpense(state, { id: editingId, monthId: row.monthId }, nowStamp());
+  markFinancialDirty(); saveState(); closeEntryDialog(); render();
 }
 
 function deleteCurrentTransfer() {
@@ -4937,25 +4830,16 @@ function deleteSelectedProject() {
 function deleteProjectById(projectId, closeDialogAfterDelete) {
   const project = state.projects.find(item => item.id === projectId);
   if (!project) return;
-
-  if (project.status === "settled") {
-    showToast(t("settledProjectDeleteDisabled"));
-    return;
-  }
-
+  if (pendingProjectEntries(project).length) return alert(t("reviewFirst"));
   if (!window.confirm(t("deleteProjectConfirm", project.name))) return;
-
-  state.projects = state.projects.filter(item => item.id !== project.id);
+  saveSyncRecovery(state, "before-project-delete");
+  ProjectLedger.deleteProject(state, projectId, nowStamp());
   selectedProjectId = null;
   detailReturnTab = "projects";
   activeTab = "projects";
-
-  markFinancialDirty();
-  saveState();
-  if (closeDialogAfterDelete) els.dialog.close();
-  dialogMode = null;
-  editingId = null;
-  render();
+  markFinancialDirty(); saveState();
+  if (closeDialogAfterDelete) closeEntryDialog();
+  dialogMode = null; editingId = null; render();
 }
 
 function updateAllocationEditor(event) {
@@ -5270,6 +5154,7 @@ function saveProject(data) {
     const project = {
       id: crypto.randomUUID(),
       type: "other",
+      accountingVersion: 1,
       ...payload,
       monthId: state.currentMonth,
       startMonth: state.currentMonth,
@@ -5294,126 +5179,7 @@ function saveProject(data) {
   render();
 }
 
-function saveProjectEntry(data) {
-  const project = selectedProject();
-  if (!project || project.status === "settled") return;
-
-  const amount = parseMoneyInput(data.amount);
-  if (amount === null || amount <= 0) {
-    alert(t("validAmount"));
-    return;
-  }
-  const fund = fundById(data.fundId) || fundByName(project.defaultCategory);
-  if (!fund) return;
-
-  const payload = {
-    date: data.date,
-    fundId: fund.id,
-    category: fund.name,
-    note: data.note.trim(),
-    amount
-  };
-
-  if (editingId) {
-    const index = project.entries.findIndex(entry => entry.id === editingId);
-    if (index >= 0) {
-      project.entries[index] = { ...project.entries[index], ...payload, updatedAt: nowStamp() };
-    }
-  } else {
-    project.entries.push({ id: crypto.randomUUID(), ...payload, createdAt: nowStamp(), updatedAt: nowStamp() });
-  }
-
-  project.updatedAt = nowStamp();
-  markFinancialDirty();
-  saveState();
-  els.dialog.close();
-  render();
-}
-
-function settleOrReopenProject() {
-  const project = selectedProject();
-  if (!project) return;
-
-  if (project.status === "settled") {
-    reopenProject(project);
-  } else {
-    settleProject(project);
-  }
-}
-
-function settleProject(project) {
-  if (project.status === "settled" || (project.settlementExpenseIds || []).length) return;
-  const breakdown = projectBreakdown(project);
-  if (!breakdown.length) return;
-  if (!window.confirm(t("settleProjectConfirm", project.name, breakdown.length))) return;
-
-  const month = currentMonth();
-  const settlementDate = defaultEntryDateForCurrentMonth();
-  const createdIds = [];
-
-  breakdown.forEach(item => {
-    const fund = month.funds.find(entry => entry.id === item.fundId) || month.funds.find(entry => entry.name === item.category);
-    if (!fund) return;
-    const stamp = nowStamp();
-    const expense = {
-      id: crypto.randomUUID(),
-      date: settlementDate,
-      category: fund.name,
-      note: project.name,
-      amount: item.amount,
-      projectId: project.id,
-      createdAt: stamp,
-      updatedAt: stamp
-    };
-    month.expenses.push(expense);
-    createdIds.push(expense.id);
-    markFundUpdatedByName(fund.name);
-  });
-  if (!createdIds.length) return;
-
-  project.status = "settled";
-  project.settlementExpenseIds = createdIds;
-  project.settledMonth = state.currentMonth;
-  project.settledAt = nowStamp();
-  project.updatedAt = nowStamp();
-  cascadeLaterMonthStartsQuietly();
-  markFinancialDirty();
-  saveState();
-  render();
-}
-
-function reopenProject(project) {
-  if (!window.confirm(t("reopenProjectConfirm", project.name))) return;
-
-  const ids = new Set(project.settlementExpenseIds || []);
-  const affectedMonths = new Set();
-  Object.entries(state.months).forEach(([monthId, month]) => {
-    month.expenses = month.expenses.filter(expense => {
-      if (!ids.has(expense.id)) return true;
-      markFundUpdatedByNameInMonth(month, expense.category);
-      affectedMonths.add(monthId);
-      return false;
-    });
-  });
-  project.status = "active";
-  project.settlementExpenseIds = [];
-  project.settledMonth = "";
-  project.settledAt = "";
-  project.updatedAt = nowStamp();
-  const cascadeFrom = [...affectedMonths].sort()[0] || state.currentMonth;
-  cascadeLaterMonthStartsQuietly(cascadeFrom);
-  markFinancialDirty();
-  saveState();
-  render();
-}
-
-function unlinkSettlementExpense(expense) {
-  if (!expense?.projectId) return;
-  const project = state.projects.find(item => item.id === expense.projectId);
-  if (!project) return;
-  project.settlementExpenseIds = (project.settlementExpenseIds || []).filter(id => id !== expense.id);
-  project.updatedAt = nowStamp();
-}
+function settleOrReopenProject() { completeOrReopenProject(); }
 
 function markFundUpdatedByName(name) {
   markFundUpdatedByNameInMonth(currentMonth(), name);
@@ -5748,8 +5514,10 @@ function importData(event) {
   reader.onload = () => {
     try {
       const imported = JSON.parse(reader.result);
-      if (!imported.months || !imported.currentMonth) throw new Error("bad format");
-      state = normalizeStateLanguage(imported);
+      if (!MoneySync.validLedger(imported, DATA_VERSION) || !imported.months[imported.currentMonth]) throw new Error("bad format");
+      const restored = normalizeStateLanguage(imported);
+      saveSyncRecovery(state, "before-backup-import");
+      state = restored;
       state.backupDirty = false;
       state.lastBackupAt = imported.lastBackupAt || imported.backupCreatedAt || new Date().toISOString();
       saveState();
