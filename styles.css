@@ -219,10 +219,32 @@ h2 {
   background-repeat: no-repeat;
 }
 
+.month-navigation {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.month-step-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.month-step-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .month-select-btn {
   justify-content: flex-start;
   min-width: 210px;
-  min-height: 42px;
+  min-height: 44px;
   background-color: rgba(255, 255, 255, 0.86);
   padding-right: 13px;
   transition: background 160ms ease, box-shadow 160ms ease;
@@ -3195,6 +3217,10 @@ menu .dialog-delete-btn {
   .topbar-actions select,
   .topbar-actions button {
     min-height: 42px;
+  }
+
+  .topbar-actions .month-navigation button {
+    min-height: 44px;
   }
 
   .topbar-actions select,

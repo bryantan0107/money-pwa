@@ -10,7 +10,7 @@
     <title>Money</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=sync-v2-1">
+    <link rel="stylesheet" href="styles.css?v=month-nav-1">
   </head>
   <body>
     <div class="app-shell">
@@ -22,7 +22,11 @@
           </div>
         </div>
         <div class="topbar-actions">
-          <button id="monthSelect" class="month-select-btn" type="button" aria-label="Open month calendar">May 2026</button>
+          <div class="month-navigation">
+            <button id="prevMonthBtn" class="month-step-btn" type="button" aria-label="Previous month"><span aria-hidden="true">‹</span></button>
+            <button id="monthSelect" class="month-select-btn" type="button" aria-label="Open month calendar" aria-controls="monthDialog" aria-expanded="false">May 2026</button>
+            <button id="nextMonthBtn" class="month-step-btn" type="button" aria-label="Next month"><span aria-hidden="true">›</span></button>
+          </div>
           <div id="monthDialog" class="month-modal" hidden>
             <section id="monthForm" class="month-card" role="dialog" aria-modal="false" aria-labelledby="monthCalendarTitle">
               <div class="month-calendar-head">
@@ -485,6 +489,6 @@
     <script src="sync-core.js?v=sync-v2-1"></script>
     <script src="sync-runtime.js?v=sync-v2-1"></script>
     <script src="sync-config.js?v=category-metadata-1"></script>
-    <script src="app.js?v=sync-v2-1"></script>
+    <script src="app.js?v=month-nav-1"></script>
   </body>
 </html>

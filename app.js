@@ -7,7 +7,7 @@ const MANUAL_FUND_SORT = "manual";
 const DEFAULT_LANGUAGE = "en";
 const DATA_VERSION = 2;
 const CATEGORY_LIFECYCLE_REPAIR_VERSION = 1;
-const APP_VERSION = "2026.10.03.1";
+const APP_VERSION = "2026.11.01.1";
 const SYNC_TABLE = "sync_states";
 const CATEGORY_ROLES = ["fixed", "spending", "savings"];
 const NECESSITIES = ["need", "want"];
@@ -308,6 +308,9 @@ const I18N = {
     fromCategoryNote: category => `From ${category}`,
     greyMonths: "Grey months have not been created yet. The small line marks the real current month.",
     openMonthCalendar: "Open month calendar",
+    previousMonth: month => `Previous month: ${month}`,
+    nextMonth: month => `Next month: ${month}`,
+    discardPlanOnMonthChange: "Discard the unsaved project plan changes and switch months?",
     previousYear: "Previous year",
     nextYear: "Next year",
     createMonth: (month, previous) => previous
@@ -620,6 +623,9 @@ const I18N = {
     fromCategoryNote: category => `从 ${category}`,
     greyMonths: "灰色月份还没有创建。细线标记现实中的当前月份。",
     openMonthCalendar: "打开月份日历",
+    previousMonth: month => `上个月：${month}`,
+    nextMonth: month => `下个月：${month}`,
+    discardPlanOnMonthChange: "放弃尚未保存的项目计划修改，并切换月份？",
     previousYear: "上一年",
     nextYear: "下一年",
     createMonth: (month, previous) => previous
@@ -878,6 +884,8 @@ const SYNC_OWNER_KEY = "money-sync-owner-v2";
 const SYNC_PREFIX = "money-sync-v2:";
 
 const els = {
+  prevMonthBtn: document.querySelector("#prevMonthBtn"),
+  nextMonthBtn: document.querySelector("#nextMonthBtn"),
   monthSelect: document.querySelector("#monthSelect"),
   privacyToggleBtn: document.querySelector("#privacyToggleBtn"),
   backupReminder: document.querySelector("#backupReminder"),
@@ -1003,6 +1011,12 @@ const els = {
 };
 
 els.monthSelect.addEventListener("click", openMonthDialog);
+els.prevMonthBtn.addEventListener("click", () => selectCalendarMonth(adjacentMonthId(-1)));
+els.nextMonthBtn.addEventListener("click", () => selectCalendarMonth(adjacentMonthId(1)));
+document.querySelector(".topbar-actions").addEventListener("pointerdown", event => {
+  // Keep the inline allocation editor available for validation before navigation.
+  if (allocationRowEdit && event.target.closest("button")) event.preventDefault();
+});
 els.privacyToggleBtn.addEventListener("click", () => {
   state.privacyMode = !state.privacyMode;
   saveState();
@@ -2038,6 +2052,13 @@ function render() {
 
 function renderMonthSelect() {
   els.monthSelect.textContent = formatMonthLabel(state.currentMonth);
+  [[els.prevMonthBtn, -1, "previousMonth"], [els.nextMonthBtn, 1, "nextMonth"]].forEach(([button, direction, label]) => {
+    const monthId = adjacentMonthId(direction);
+    button.disabled = !monthId;
+    const text = t(label, monthId ? formatMonthLabel(monthId) : "");
+    button.setAttribute("aria-label", text);
+    button.title = text;
+  });
 }
 
 function renderStaticLanguage() {
@@ -2048,7 +2069,7 @@ function renderStaticLanguage() {
   els.privacyToggleBtn.setAttribute("aria-pressed", String(Boolean(state.privacyMode)));
   els.privacyToggleBtn.setAttribute("aria-label", state.privacyMode ? t("showAmounts") : t("hideAmounts"));
   els.privacyToggleBtn.title = state.privacyMode ? t("showAmounts") : t("hideAmounts");
-  els.monthSelect.setAttribute("aria-label", t("openMonthCalendar"));
+  els.monthSelect.setAttribute("aria-label", `${formatMonthLabel(state.currentMonth)} · ${t("openMonthCalendar")}`);
   els.backupNowBtn.textContent = t("backupNow");
   els.dismissBackupBtn.textContent = t("later");
   document.querySelector("#backupReminder strong").textContent = t("backupTitle");
@@ -5522,10 +5543,12 @@ function openMonthDialog() {
   monthCalendarYear = Number(state.currentMonth.slice(0, 4));
   renderMonthCalendar();
   els.monthDialog.hidden = false;
+  els.monthSelect.setAttribute("aria-expanded", "true");
 }
 
 function closeMonthDialog() {
   els.monthDialog.hidden = true;
+  els.monthSelect.setAttribute("aria-expanded", "false");
 }
 
 function renderMonthCalendar() {
@@ -5549,28 +5572,69 @@ function renderMonthCalendar() {
 }
 
 function selectCalendarMonth(monthId) {
-  if (state.months[monthId]) {
-    switchMonth(monthId);
+  if (!monthId) return;
+  if (monthId === state.currentMonth) {
     closeMonthDialog();
     return;
   }
+  if (!canLeaveMonth()) return;
 
-  const previousKey = previousMonthKey(monthId);
-  const message = t("createMonth", formatMonthLabel(monthId), previousKey ? formatMonthLabel(previousKey) : "");
+  if (!state.months[monthId]) {
+    const previousKey = previousMonthKey(monthId);
+    const message = t("createMonth", formatMonthLabel(monthId), previousKey ? formatMonthLabel(previousKey) : "");
+    if (!window.confirm(message)) return;
+    createMonthRecord(monthId);
+  }
 
-  if (!window.confirm(message)) return;
-  createMonthRecord(monthId);
   switchMonth(monthId);
   closeMonthDialog();
 }
 
+function adjacentMonthId(direction) {
+  const [year, month] = state.currentMonth.split("-").map(Number);
+  const index = year * 12 + month - 1 + direction;
+  const nextYear = Math.floor(index / 12);
+  if (nextYear < 1 || nextYear > 9999) return null;
+  return `${String(nextYear).padStart(4, "0")}-${String(index % 12 + 1).padStart(2, "0")}`;
+}
+
+function canLeaveMonth() {
+  if (els.dialog.open) return false;
+  if (allocationRowEdit) {
+    const input = els.allocationDetailTable.querySelector(`[data-detail-allocation-input][data-fund-id="${allocationRowEdit.fundId}"]`);
+    const amount = input ? parseMoneyInput(input.value) : null;
+    if (amount === null || amount < 0) {
+      showToast(t("validAllocations"));
+      input?.focus({ preventScroll: true });
+      return false;
+    }
+    commitAllocationRowEdit(input);
+    if (allocationRowEdit) return false;
+  }
+
+  const project = selectedProject();
+  if (!project) return true;
+  const notesChanged = !els.projectPlanEditor.hidden &&
+    els.projectPlanTextarea.value.trimEnd() !== (project.planText || "").trimEnd();
+  const plans = dailyPlanMap(project);
+  const dailyChanged = [...els.projectDailyPlanList.querySelectorAll("[data-project-day]")]
+    .some(input => input.value.trimEnd() !== (plans.get(input.dataset.projectDay)?.note || "").trimEnd());
+  return !(notesChanged || dailyChanged) || window.confirm(t("discardPlanOnMonthChange"));
+}
+
 function switchMonth(monthId) {
+  const nextTab = selectedProjectId ? "projects"
+    : selectedFundId || showingAllocationDetail ? "home" : activeTab;
+  resetDetailTransitions();
+  closeRecordFilterMenu();
+  closeAddRecordMenu();
   state.currentMonth = monthId;
   selectedFundId = null;
   selectedProjectId = null;
+  allocationRowEdit = null;
   showingAllocationDetail = false;
-  activeTab = "home";
-  detailReturnTab = "home";
+  activeTab = nextTab;
+  detailReturnTab = nextTab;
   tabScrollPositions.home = 0;
   tabScrollPositions.records = 0;
   tabScrollPositions.projects = 0;
